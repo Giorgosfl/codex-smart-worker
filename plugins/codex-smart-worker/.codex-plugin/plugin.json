@@ -1,7 +1,7 @@
 {
   "name": "codex-smart-worker",
-  "version": "0.1.0+codex.20260920154451",
-  "description": "Consider general Codex work for TypeSafe Jev classification and delegate eligible bounded tasks to DeepSeek Flash for Codex review.",
+  "version": "0.1.0+codex.20260920194533",
+  "description": "Automatically route worthwhile bounded subtasks throughout Codex work through TypeSafe Jev to DeepSeek Flash for Codex review.",
   "author": {
     "name": "Giorgos Florou"
   },
@@ -18,13 +18,13 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Codex Smart Worker",
-    "shortDescription": "Delegate safe, bounded work from any domain.",
-    "longDescription": "Every general request is considered locally. Codex plans and reviews while TypeSafe Jev routes sanitized bounded work to DeepSeek Flash when risk and confidence allow.",
+    "shortDescription": "Automatically delegate suitable subtasks throughout work.",
+    "longDescription": "Without an explicit plugin mention, Codex identifies worthwhile independent subtasks throughout each request. TypeSafe Jev routes sanitized candidates to DeepSeek Flash when risk and confidence allow. Codex plans, uses tools, reviews proposals and reports aggregate request usage.",
     "developerName": "Giorgos Florou",
     "category": "Productivity",
     "capabilities": [
       "External API calls"
     ],
-    "defaultPrompt": "Consider this request for a sanitized bounded Smart Worker subtask, then review any proposed result."
+    "defaultPrompt": "Automatically delegate suitable bounded subtasks throughout this request, review each proposal, and report aggregate Smart Worker usage."
   }
 }

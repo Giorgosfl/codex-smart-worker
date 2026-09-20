@@ -30,7 +30,7 @@ class ProviderError extends Error {
 const delegateTaskTool = {
   name: "delegate_task",
   description:
-    "Classify one bounded subtask with TypeSafe Jev and delegate it to DeepSeek Flash only when Jev marks it low-risk with sufficient confidence. Returns a proposal for Codex to review. If either provider fails, asks the user whether to continue with Codex or stop.",
+    "Automatically use for each worthwhile independent bounded subtask throughout a nontrivial request, without requiring a plugin mention. Each call classifies one candidate with TypeSafe Jev and delegates to DeepSeek Flash only when risk and confidence allow. Batch tiny related work, review each proposal, and aggregate returned stats across the request. Call sequentially; a provider-failure choice to continue with Codex stops all delegation for the current request.",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -371,7 +371,7 @@ export async function delegateTask(
     }
   } catch (error) {
     const result = await resolveFailure("DeepSeek", error, onProviderFailure);
-    return { ...result, stats: usageStats({ classification, typesafeRequests, deepseekRequests, thinkingEffort }) };
+    return { ...result, stats: usageStats({ classification, completion, typesafeRequests, deepseekRequests, thinkingEffort }) };
   }
 
   return {
@@ -438,7 +438,7 @@ export function createServer({
       return {
         status: "continue_with_codex",
         failure,
-        instruction: "Continue the current task entirely with Codex. Do not delegate this task again."
+        instruction: "Continue the entire current user request with Codex. Do not delegate any remaining subtask of this request."
       };
     }
 
@@ -457,7 +457,7 @@ export function createServer({
             capabilities: { tools: {} },
             serverInfo: { name: "codex-smart-worker", version: "0.1.0" },
             instructions:
-              "Consider bounded candidate subtasks from any domain, not only coding. Send only sanitized minimum context, review every proposal, and follow the returned user decision when a provider fails."
+              "Automatically delegate each worthwhile independent bounded subtask throughout nontrivial work without requiring a plugin mention. Batch tiny related work; reassess after results and phase changes. Send only sanitized minimum context, retain planning, tools, sensitive actions and final review in Codex, and review every proposal. Call sequentially and honor provider-failure choices for the entire current request. Aggregate returned stats across all calls in that request for one scoped usage receipt."
           }
         });
         return;

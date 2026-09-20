@@ -32,12 +32,12 @@ Your request
 | Feature | Behavior |
 | --- | --- |
 | Local setup | The plugin and API keys stay on your computer |
-| General routing | Every nontrivial request is considered, not only coding |
+| Automatic routing | Suitable subtasks are considered throughout work, without a plugin mention |
 | Guarded delegation | Jev must approve the task before DeepSeek is called |
 | Human-friendly setup | One menu installs, updates, removes keys, or uninstalls |
 | Codex stays in control | Worker output is only a proposal; Codex reviews it |
 | Adjustable thinking | DeepSeek defaults to `high`; change it later from Codex |
-| Automatic usage receipt | Each completed routed task shows requests, reported tokens, and estimated cost |
+| Automatic usage receipt | One scoped receipt totals all calls in the current request |
 | Cross-platform | macOS, Linux, and Windows setup scripts |
 
 ## 🚀 Install
@@ -111,13 +111,15 @@ Option **7** removes the plugin, marketplace entry, and both local key files aft
 
 The plugin includes a local `UserPromptSubmit` hook and exposes two tools: `delegate_task` and `set_thinking_effort`.
 
-1. The hook locally reminds Codex to consider every nontrivial request for delegation. It discards the original prompt and makes no API request.
-2. Codex understands the request and isolates one bounded candidate with only the minimum sanitized context.
+1. The hook locally reminds Codex to use Smart Worker automatically, without waiting for an explicit plugin mention. It discards the original prompt and makes no API request.
+2. Codex understands the request and identifies each worthwhile independent bounded candidate with only the minimum sanitized context. Tiny related edits are batched; trivial work stays local.
 3. TypeSafe Jev chooses `deepseek`, `codex`, or `ask_user` and assigns a risk level.
 4. DeepSeek Flash runs only for a low-risk `deepseek` decision with sufficient confidence.
-5. The result returns to Codex as an untrusted proposal for final review.
+5. The result returns to Codex as an untrusted proposal for review. Codex reassesses remaining work after results, phase changes and material user steering; there is no one-call-per-request limit.
 
-After Codex finishes the request, it appends a compact **Smart Worker usage** receipt. It reports one TypeSafe request, whether DeepSeek was called, token counts supplied by each provider, DeepSeek cache and reasoning tokens when available, and an estimated USD cost range. The estimate uses published rates dated **2026-09-19**; provider billing dashboards remain authoritative. No usage history is stored or uploaded by the plugin.
+Calls are sequential so a provider-failure choice takes effect before any further delegation. Codex avoids duplicate work and needless classifications. The hook and skill guide Codex's decisions; they do not intercept every model action or mechanically guarantee a delegation count. Ordinary Codex subagents are separate from Smart Worker requests.
+
+After Codex finishes the request, it appends a compact **Smart Worker usage — this request** receipt. Codex keeps a running ledger of returned `stats` across continuations and totals all calls, including rejected proposals and provider failures. The receipt reports each provider's request count, reported token counts, cache/reasoning subsets when available, and summed estimated USD cost bounds. Missing figures are marked unavailable or partial; historical task totals are reported separately only when all receipts are available. The estimate uses published rates dated **2026-09-19**; provider billing dashboards remain authoritative. No usage history is stored or uploaded by the plugin.
 
 This applies to drafting, summarizing, transforming, organizing, research synthesis, and coding. Trivial conversation, secrets, private data, ambiguous planning, tool use, destructive actions, high-stakes decisions, and final judgment stay in Codex. The worker cannot edit files, run terminal commands, or take external actions directly.
 
@@ -148,7 +150,7 @@ Provider could not complete the request.
 
 | Choice | Result |
 | --- | --- |
-| Continue with Codex | Codex completes the current task itself and does not delegate it again |
+| Continue with Codex | Codex completes the entire current user request, including remaining subtasks and continuations, without further delegation |
 | Stop | The current task stops without continuing the work |
 
 TypeSafe failures stop the flow before DeepSeek is called. DeepSeek failures are not automatically retried. Provider response bodies are not shown, so billing or account details from an error cannot leak into the conversation.

@@ -223,6 +223,60 @@ test("asks for a decision when DeepSeek is unavailable", async () => {
   assert.equal(calls, 2);
 });
 
+test("preserves reported usage when DeepSeek returns no proposal", async () => {
+  let calls = 0;
+  const result = await delegateTask(
+    { task: "Draft three headings." },
+    {
+      TYPESAFE_API_KEY: "test-typesafe",
+      DEEPSEEK_API_KEY: "test-deepseek",
+      DEEPSEEK_REASONING_EFFORT: "high"
+    },
+    async (url) => {
+      calls += 1;
+      if (url.includes("typesafe")) {
+        return response({
+          usage: { input_tokens: 1000, output_tokens: 20 },
+          answers: {
+            route: { choice: "deepseek", confidence: 0.99 },
+            risk: { choice: "low", confidence: 0.99 }
+          }
+        });
+      }
+      return response({
+        choices: [{ message: {} }],
+        usage: {
+          prompt_tokens: 1000,
+          prompt_cache_hit_tokens: 200,
+          prompt_cache_miss_tokens: 800,
+          completion_tokens: 50,
+          completion_tokens_details: { reasoning_tokens: 40 },
+          total_tokens: 1050
+        }
+      });
+    },
+    async (failure) => ({ status: "continue_with_codex", failure })
+  );
+
+  assert.equal(result.status, "continue_with_codex");
+  assert.equal(result.failure.issue, "invalid_response");
+  assert.equal(calls, 2);
+  assert.equal(result.stats.typesafe.requests, 1);
+  assert.equal(result.stats.deepseek.requests, 1);
+  assert.equal(result.stats.deepseek.prompt_tokens, 1000);
+  assert.equal(result.stats.deepseek.completion_tokens, 50);
+  assert.equal(result.stats.deepseek.reasoning_tokens, 40);
+  assert.equal(result.stats.deepseek.total_tokens, 1050);
+  assert.deepEqual(result.stats.deepseek.estimated_cost_usd, {
+    minimum: 0.0001506,
+    maximum: 0.0003012
+  });
+  assert.deepEqual(result.stats.estimated_total_cost_usd, {
+    minimum: 0.0001926,
+    maximum: 0.0003432
+  });
+});
+
 test("opens native elicitation and continues with Codex after a provider failure", async () => {
   const messages = [];
   const server = createServer({

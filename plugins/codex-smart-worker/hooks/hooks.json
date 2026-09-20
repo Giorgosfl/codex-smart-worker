@@ -1,5 +1,5 @@
 {
-  "description": "Consider every general Codex task for guarded Smart Worker delegation.",
+  "description": "Automatically consider worthwhile bounded subtasks throughout general Codex work for guarded delegation.",
   "hooks": {
     "UserPromptSubmit": [
       {
