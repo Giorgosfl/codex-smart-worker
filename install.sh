@@ -27,6 +27,38 @@ Codex Smart Worker installer
 EOF
 }
 
+choose_action() {
+  local choice
+
+  while true; do
+    cat <<'EOF'
+
+Codex Smart Worker
+
+  1) Install plugin and set up both API keys
+  2) Change TypeSafe API key
+  3) Change DeepSeek API key
+  4) Remove TypeSafe API key
+  5) Remove DeepSeek API key
+  6) Remove both API keys
+  7) Exit
+EOF
+    printf '\nChoose an option [1-7]: '
+    read -r choice || fail "run this installer in an interactive Terminal window."
+
+    case "$choice" in
+      1) action="install"; target=""; return ;;
+      2) action="change"; target="typesafe"; return ;;
+      3) action="change"; target="deepseek"; return ;;
+      4) action="remove"; target="typesafe"; return ;;
+      5) action="remove"; target="deepseek"; return ;;
+      6) action="remove"; target="all"; return ;;
+      7) printf 'Goodbye.\n'; exit 0 ;;
+      *) printf 'Please choose a number from 1 to 7.\n' ;;
+    esac
+  done
+}
+
 save_key() {
   local service="$1"
   local label="$2"
@@ -87,8 +119,12 @@ remove_keys() {
   printf 'Removed %s from macOS Keychain.\n' "$description"
 }
 
-action="${1:-install}"
+action="${1:-}"
 target="${2:-}"
+
+if [[ -z "$action" ]]; then
+  choose_action
+fi
 
 case "$action" in
   help|-h|--help)
