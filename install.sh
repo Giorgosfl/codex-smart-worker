@@ -40,7 +40,7 @@ choose_action() {
     cat <<'EOF'
 
 ╭────────────────────────────────────────────╮
-│       Codex Smart Worker Installer v5      │
+│       Codex Smart Worker Installer v6      │
 ╰────────────────────────────────────────────╯
 
   1) Install plugin and set up missing API keys
@@ -228,6 +228,7 @@ case "$action" in
     ;;
   --dry-run)
     printf 'codex plugin marketplace add %s\n' "$MARKETPLACE"
+    printf 'codex plugin marketplace upgrade %s\n' "$MARKETPLACE_NAME"
     printf 'codex plugin add %s\n' "$PLUGIN"
     exit 0
     ;;
@@ -238,6 +239,7 @@ case "$action" in
     check_requirements
     printf 'Installing Codex Smart Worker...\n'
     codex plugin marketplace add "$MARKETPLACE"
+    codex plugin marketplace upgrade "$MARKETPLACE_NAME"
     codex plugin add "$PLUGIN"
     printf '\nChecking local API keys...\n'
     setup_missing_keys

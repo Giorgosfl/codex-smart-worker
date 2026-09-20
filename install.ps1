@@ -23,7 +23,7 @@ function Select-Action {
     while ($true) {
         Write-Host ""
         Write-Host "+--------------------------------------------+"
-        Write-Host "|       Codex Smart Worker Installer v5      |"
+        Write-Host "|       Codex Smart Worker Installer v6      |"
         Write-Host "+--------------------------------------------+"
         Write-Host ""
         Write-Host "  1) Install plugin and set up missing API keys"
@@ -174,6 +174,8 @@ switch ($Action) {
         Write-Host "Installing Codex Smart Worker..."
         & codex plugin marketplace add $Marketplace
         if ($LASTEXITCODE -ne 0) { Fail "marketplace installation failed." }
+        & codex plugin marketplace upgrade $MarketplaceName
+        if ($LASTEXITCODE -ne 0) { Fail "marketplace refresh failed." }
         & codex plugin add $Plugin
         if ($LASTEXITCODE -ne 0) { Fail "plugin installation failed." }
         Write-Host ""
@@ -190,6 +192,7 @@ switch ($Action) {
     "--remove-keys" { Remove-Keys "all"; exit 0 }
     "--dry-run" {
         Write-Host "codex plugin marketplace add $Marketplace"
+        Write-Host "codex plugin marketplace upgrade $MarketplaceName"
         Write-Host "codex plugin add $Plugin"
         exit 0
     }

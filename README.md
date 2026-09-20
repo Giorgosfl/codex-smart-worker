@@ -96,7 +96,7 @@ The installer creates one private file per key:
 - Windows removes inherited access from each key file and grants access to the current Windows user.
 - The values do not enter shell history, Git, the README, or Codex chat.
 - Apple Keychain is not used.
-- On macOS, installer v5 removes any matching credentials left behind by the older Keychain-based installer.
+- On macOS, installer v6 removes any matching credentials left behind by the older Keychain-based installer.
 - Keys are stored as local plaintext protected by operating-system file permissions; they are not encrypted at rest.
 - Keys are not synchronized. Run the installer once on every computer where you want to use the plugin.
 
@@ -149,7 +149,7 @@ If a Codex client does not advertise native MCP elicitation support, the tool re
 | Nothing appears while entering a key | That is expected; the prompt intentionally hides the value |
 | Setup cannot read input | Run it in Terminal or PowerShell, not inside Codex chat |
 | No TypeSafe request appears | Open `/hooks`, trust the Smart Worker hook, restart Codex, and test in a new task; trivial or unsafe work may correctly remain in Codex |
-| Plugin changes are missing | Reinstall the plugin, restart Codex, and start a new task |
+| Plugin changes are missing | Run installer v6 again; it refreshes the marketplace before reinstalling. Then restart Codex and start a new task |
 | Using a custom Codex home | Set `CODEX_HOME` before running the installer and before starting Codex |
 
 ## 🧪 Development
