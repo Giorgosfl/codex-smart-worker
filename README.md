@@ -45,7 +45,7 @@ Your request
 Open Terminal and run:
 
 ```sh
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/259455b1b96fa3d406ce449f551f4b8a1645231d/install.sh)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/cda4c34dd7cc78817008dc0a57c1864807be2618/install.sh)"
 ```
 
 ### Windows
@@ -53,7 +53,7 @@ Open Terminal and run:
 Open PowerShell and run:
 
 ```powershell
-irm https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/259455b1b96fa3d406ce449f551f4b8a1645231d/install.ps1 | iex
+irm https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/cda4c34dd7cc78817008dc0a57c1864807be2618/install.ps1 | iex
 ```
 
 > The installer links are pinned to a specific reviewed commit. You can inspect [install.sh](install.sh) or [install.ps1](install.ps1) before running them.
@@ -61,7 +61,7 @@ irm https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/259455b1b96fa
 The same menu handles everything:
 
 ```text
-1) Install plugin and set up both API keys
+1) Install plugin and set up missing API keys
 2) Change TypeSafe API key
 3) Change DeepSeek API key
 4) Remove TypeSafe API key
@@ -71,7 +71,7 @@ The same menu handles everything:
 8) Exit
 ```
 
-Choose **1**, paste each key into its hidden prompt, restart Codex, and begin a new task.
+Choose **1**, paste any missing key into its hidden prompt, restart Codex, and begin a new task. On reinstall, non-empty saved keys are kept automatically. Use options **2** or **3** only when you want to replace a key.
 
 ## ✅ Requirements
 
@@ -95,7 +95,7 @@ The installer creates one private file per key:
 - Windows removes inherited access from each key file and grants access to the current Windows user.
 - The values do not enter shell history, Git, the README, or Codex chat.
 - Apple Keychain is not used.
-- On macOS, installer v3 removes any matching credentials left behind by the older Keychain-based installer.
+- On macOS, installer v4 removes any matching credentials left behind by the older Keychain-based installer.
 - Keys are stored as local plaintext protected by operating-system file permissions; they are not encrypted at rest.
 - Keys are not synchronized. Run the installer once on every computer where you want to use the plugin.
 
