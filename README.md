@@ -5,7 +5,6 @@
 **Codex plans and reviews. TypeSafe Jev routes. DeepSeek Flash drafts.**
 
 ![Local only](https://img.shields.io/badge/setup-local--only-2563eb)
-![No Keychain](https://img.shields.io/badge/Apple%20Keychain-not%20used-111827)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-059669)
 ![License](https://img.shields.io/badge/license-MIT-7c3aed)
 
@@ -96,8 +95,6 @@ The installer creates one private file per key:
 - macOS and Linux use user-only directory and file permissions (`700` and `600`).
 - Windows removes inherited access from each key file and grants access to the current Windows user.
 - The values do not enter shell history, Git, the README, or Codex chat.
-- Apple Keychain is not used.
-- On macOS, installer v6 removes any matching credentials left behind by the older Keychain-based installer.
 - Keys are stored as local plaintext protected by operating-system file permissions; they are not encrypted at rest.
 - Keys are not synchronized. Run the installer once on every computer where you want to use the plugin.
 
