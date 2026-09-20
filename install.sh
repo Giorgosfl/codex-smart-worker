@@ -35,7 +35,7 @@ choose_action() {
   while true; do
     cat <<'EOF'
 
-Codex Smart Worker
+Codex Smart Worker Installer v2
 
   1) Install plugin and set up both API keys
   2) Change TypeSafe API key

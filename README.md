@@ -16,8 +16,10 @@ Never paste an API key into Codex chat, a GitHub issue, or a configuration file.
 First, [review the short installer](https://github.com/Giorgosfl/codex-smart-worker/blob/main/install.sh). Then open Terminal and run:
 
 ```sh
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/main/install.sh)"
+/bin/bash -c "$(curl -fsSL "https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/main/install.sh?cache=$(date +%s)")"
 ```
+
+The changing `cache` value prevents GitHub from serving an older cached installer.
 
 The installer opens this menu:
 
