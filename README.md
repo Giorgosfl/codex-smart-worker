@@ -1,27 +1,64 @@
-# Codex Smart Worker
+<div align="center">
 
-Codex plans and reviews. TypeSafe Jev decides whether a bounded task is safe to delegate. DeepSeek Flash produces a proposal for Codex to inspect before applying.
+# 🧠 Codex Smart Worker
 
-## What you need
+**Codex plans and reviews. TypeSafe Jev routes. DeepSeek Flash drafts.**
 
-- macOS
-- Node.js 20 or newer
-- A TypeSafe API key
-- A DeepSeek API key
+![Local only](https://img.shields.io/badge/setup-local--only-2563eb)
+![No Keychain](https://img.shields.io/badge/Apple%20Keychain-not%20used-111827)
+![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-059669)
+![License](https://img.shields.io/badge/license-MIT-7c3aed)
 
-Never paste an API key into Codex chat, a GitHub issue, or a configuration file.
+</div>
 
-## Install and set up
+Codex Smart Worker gives Codex a guarded way to delegate small, well-defined tasks to a cheaper model. TypeSafe Jev classifies each candidate first. DeepSeek Flash receives it only when the task is low-risk and the classification is confident enough. Codex remains responsible for the plan, review, edits, and tests.
 
-First, [review the short installer](https://github.com/Giorgosfl/codex-smart-worker/blob/main/install.sh). Then open Terminal and run:
-
-```sh
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/57196bc/install.sh)"
+```text
+Your request
+    │
+    ▼
+  Codex ──► TypeSafe Jev
+               │
+        ┌──────┴──────┐
+        │             │
+   keep in Codex   DeepSeek Flash
+        │             │
+        └──────┬──────┘
+               ▼
+        Codex reviews it
 ```
 
-The installer URL is pinned to a reviewed commit so GitHub cannot serve an older `main`-branch copy.
+## ✨ What you get
 
-The installer opens this menu:
+| Feature | Behavior |
+| --- | --- |
+| Local setup | The plugin and API keys stay on your computer |
+| Guarded delegation | Jev must approve the task before DeepSeek is called |
+| Human-friendly setup | One menu installs, updates, removes keys, or uninstalls |
+| Codex stays in control | Worker output is only a proposal; Codex reviews it |
+| Cross-platform | macOS, Linux, and Windows setup scripts |
+
+## 🚀 Install
+
+### macOS or Linux
+
+Open Terminal and run:
+
+```sh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/259455b1b96fa3d406ce449f551f4b8a1645231d/install.sh)"
+```
+
+### Windows
+
+Open PowerShell and run:
+
+```powershell
+irm https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/259455b1b96fa3d406ce449f551f4b8a1645231d/install.ps1 | iex
+```
+
+> The installer links are pinned to a specific reviewed commit. You can inspect [install.sh](install.sh) or [install.ps1](install.ps1) before running them.
+
+The same menu handles everything:
 
 ```text
 1) Install plugin and set up both API keys
@@ -34,24 +71,73 @@ The installer opens this menu:
 8) Exit
 ```
 
-Option 1 runs the normal Codex marketplace and plugin installation commands, then asks for each key using a hidden macOS Keychain prompt. The prompt clearly identifies which API key to paste and explains that it is not asking for your Mac password. The key values never appear in shell history, process arguments, the repository, or Codex chat. Restart Codex and begin a new task when it finishes.
+Choose **1**, paste each key into its hidden prompt, restart Codex, and begin a new task.
 
-## Change or remove individual keys
+## ✅ Requirements
 
-Run the same installer command again and select the key you want to change or remove from the menu.
+- Codex with local plugin support
+- Node.js 20 or newer
+- A TypeSafe API key
+- A DeepSeek API key
 
-Option 7 completely uninstalls Codex Smart Worker by removing the plugin, its marketplace entry, and both saved API keys after confirmation.
+There is no hosting service, account system, database, or monthly plugin charge. You pay only for your own TypeSafe and DeepSeek usage.
 
-Removing a key from Keychain does not revoke it. If a key may have been exposed, revoke it on the TypeSafe or DeepSeek website too.
+## 🔐 Where your keys live
 
-## How it works
+The installer creates one private file per key:
 
-The plugin exposes `delegate_task`. It asks Jev to classify a bounded task and sends only low-risk, high-confidence tasks to DeepSeek Flash. Every result returns to Codex as an untrusted proposal for review and testing.
+| System | Local folder |
+| --- | --- |
+| macOS / Linux | `~/.codex/codex-smart-worker/credentials/` |
+| Windows | `%USERPROFILE%\.codex\codex-smart-worker\credentials\` |
 
-The worker has no direct file or terminal access. Environment variables remain available as an optional fallback for automated or non-macOS environments.
+- macOS and Linux use user-only directory and file permissions (`700` and `600`).
+- Windows removes inherited access from each key file and grants access to the current Windows user.
+- The values do not enter shell history, Git, the README, or Codex chat.
+- Apple Keychain is not used.
+- On macOS, installer v3 removes any matching credentials left behind by the older Keychain-based installer.
+- Keys are stored as local plaintext protected by operating-system file permissions; they are not encrypted at rest.
+- Keys are not synchronized. Run the installer once on every computer where you want to use the plugin.
 
-## Troubleshooting
+Environment variables named `TYPESAFE_API_KEY` and `DEEPSEEK_API_KEY` remain supported and take priority over the local files for automation.
 
-- **“API key is not configured”** — rerun the installer and select the matching change-key option, then restart Codex and start a new task.
-- **Setup cannot open a prompt** — run the installer in the Terminal app, not inside Codex chat.
-- **Plugin changes are not visible** — reinstall the plugin, restart Codex, and start a new task.
+## 🛠 Manage or remove keys
+
+Run the same installation command whenever you need the menu again. You can replace or remove either key without touching the other.
+
+Option **7** removes the plugin, marketplace entry, and both local key files after confirmation. Removing a local key does not revoke it at the provider. If a key may have been exposed, revoke it in the TypeSafe or DeepSeek dashboard as well.
+
+## 🧩 How delegation works
+
+The plugin exposes one tool: `delegate_task`.
+
+1. Codex isolates a bounded task and sends only the necessary context to TypeSafe Jev.
+2. Jev chooses `deepseek`, `codex`, or `ask_user` and assigns a risk level.
+3. DeepSeek Flash runs only for a low-risk `deepseek` decision with sufficient confidence.
+4. The result returns to Codex as an untrusted proposal.
+5. Codex reviews the proposal and decides whether to apply and test it.
+
+The worker cannot edit files or run terminal commands directly.
+
+## 🩺 Troubleshooting
+
+| Problem | Fix |
+| --- | --- |
+| `API key is not configured` | Run the installer again, choose option 2 or 3, then restart Codex |
+| Nothing appears while entering a key | That is expected; the prompt intentionally hides the value |
+| Setup cannot read input | Run it in Terminal or PowerShell, not inside Codex chat |
+| Plugin changes are missing | Reinstall the plugin, restart Codex, and start a new task |
+| Using a custom Codex home | Set `CODEX_HOME` before running the installer and before starting Codex |
+
+## 🧪 Development
+
+```sh
+cd plugins/codex-smart-worker
+npm test
+```
+
+The plugin uses only Node.js built-ins at runtime.
+
+## License
+
+[MIT](LICENSE)
