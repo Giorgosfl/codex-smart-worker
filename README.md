@@ -119,6 +119,25 @@ The plugin exposes one tool: `delegate_task`.
 
 The worker cannot edit files or run terminal commands directly.
 
+## 🛟 When a provider fails
+
+If TypeSafe or DeepSeek has an outage, rejects a key, reaches a rate limit, or runs out of credits, Codex Smart Worker immediately opens a native choice window:
+
+```text
+Provider could not complete the request.
+
+[ Continue with Codex ]  [ Stop ]
+```
+
+| Choice | Result |
+| --- | --- |
+| Continue with Codex | Codex completes the current task itself and does not delegate it again |
+| Stop | The current task stops without continuing the work |
+
+TypeSafe failures stop the flow before DeepSeek is called. DeepSeek failures are not automatically retried. Provider response bodies are not shown, so billing or account details from an error cannot leak into the conversation.
+
+If a Codex client does not advertise native MCP elicitation support, the tool returns the same two-choice instruction for Codex to present through its built-in user prompt.
+
 ## 🩺 Troubleshooting
 
 | Problem | Fix |

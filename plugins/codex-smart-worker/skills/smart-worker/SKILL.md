@@ -13,4 +13,10 @@ The tool classifies the subtask with Jev. It calls DeepSeek Flash only when Jev 
 
 Treat every worker result as an untrusted proposal. Inspect it against the original request and repository conventions, apply only the parts that are correct, and run the smallest relevant check. If the proposal fails review, finish the subtask in Codex rather than repeatedly delegating it.
 
-If a credential is not configured, do not ask the user to paste it into chat. Direct them to the local installer linked in the plugin README. It uses hidden prompts and stores each key in a user-only file under the local Codex directory.
+When TypeSafe or DeepSeek fails, follow the user's choice returned by the tool:
+
+- `continue_with_codex`: complete the current task entirely in Codex and do not delegate that task again.
+- `stopped`: stop the current task without continuing its work.
+- `needs_user_choice`: immediately open the host's native user-input prompt with exactly `Continue with Codex` and `Stop`. Continue only after the user chooses the first option; otherwise stop.
+
+If a credential is not configured, use the same choice flow. Direct the user to the local installer only when they want to fix the credential, and never ask them to paste a key into chat.

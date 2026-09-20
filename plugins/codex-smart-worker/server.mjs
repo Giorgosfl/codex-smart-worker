@@ -7,10 +7,17 @@ const TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone";
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const MIN_CONFIDENCE = 0.75;
 
+class ProviderError extends Error {
+  constructor(provider, status) {
+    super(`${provider} request failed`);
+    this.status = status;
+  }
+}
+
 const tool = {
   name: "delegate_task",
   description:
-    "Classify one bounded subtask with TypeSafe Jev and delegate it to DeepSeek Flash only when Jev marks it low-risk with sufficient confidence. Returns a proposal for Codex to review; never edits files or runs commands.",
+    "Classify one bounded subtask with TypeSafe Jev and delegate it to DeepSeek Flash only when Jev marks it low-risk with sufficient confidence. Returns a proposal for Codex to review. If either provider fails, asks the user whether to continue with Codex or stop.",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -63,11 +70,44 @@ async function postJson(url, apiKey, body, service, fetchFn) {
   });
 
   if (!response.ok) {
-    const detail = (await response.text()).slice(0, 500);
-    throw new Error(`${service} returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`);
+    throw new ProviderError(service, response.status);
   }
 
   return response.json();
+}
+
+function safeFailure(provider, error) {
+  const status = error instanceof ProviderError ? error.status : null;
+  let issue = "service_unavailable";
+
+  if (status === 401 || status === 403) issue = "authentication";
+  else if (status === 402) issue = "billing_or_quota";
+  else if (status === 429) issue = "rate_limit_or_quota";
+  else if (error instanceof Error && error.message.includes("not configured")) issue = "configuration";
+  else if (error instanceof Error && /missing|did not contain/i.test(error.message)) issue = "invalid_response";
+  else if (error instanceof Error && /abort|timeout/i.test(`${error.name} ${error.message}`)) issue = "timeout";
+
+  const descriptions = {
+    authentication: "rejected the API key",
+    billing_or_quota: "reported a billing or credit problem",
+    rate_limit_or_quota: "reported a rate or quota limit",
+    configuration: "API key is not configured",
+    invalid_response: "returned an invalid response",
+    timeout: "did not respond in time",
+    service_unavailable: "could not complete the request"
+  };
+
+  return {
+    provider,
+    issue,
+    message: `${provider} ${descriptions[issue]}.`
+  };
+}
+
+async function resolveFailure(provider, error, onProviderFailure) {
+  const failure = safeFailure(provider, error);
+  if (typeof onProviderFailure === "function") return onProviderFailure(failure);
+  return { status: "needs_user_choice", failure };
 }
 
 function choiceAnswer(payload, name) {
@@ -78,45 +118,57 @@ function choiceAnswer(payload, name) {
   return answer;
 }
 
-export async function delegateTask(input, env = process.env, fetchFn = globalThis.fetch) {
+export async function delegateTask(
+  input,
+  env = process.env,
+  fetchFn = globalThis.fetch,
+  onProviderFailure
+) {
   const task = requiredText(input?.task, "task", 8000);
   const context = optionalText(input?.context, "context", 60000);
   const constraints = optionalText(input?.constraints, "constraints", 8000);
-  const typesafeKey = requiredText(await getCredential("TYPESAFE_API_KEY", env), "TYPESAFE_API_KEY", 10000);
+  let classification;
+  let route;
+  let risk;
 
-  const classification = await postJson(
-    TYPESAFE_URL,
-    typesafeKey,
-    {
-      state: { task, context, constraints },
-      model: "jev-latest",
-      questions: {
-        route: {
-          type: "choice",
-          instructions: "Who should perform this isolated software task?",
-          criteria: {
-            deepseek: "Bounded, low-risk, well-specified work that can be proposed from the supplied context.",
-            codex: "Architecture, broad repository reasoning, security-sensitive work, destructive work, secrets, or work requiring final judgment.",
-            ask_user: "A consequential requirement or permission is missing."
-          }
-        },
-        risk: {
-          type: "choice",
-          instructions: "What is the execution risk of delegating this task to a model with no tools?",
-          criteria: {
-            low: "The proposal is easily reviewed and cannot directly change systems or data.",
-            medium: "The proposal could cause meaningful defects or disclose sensitive context.",
-            high: "The task involves security, secrets, destructive actions, permissions, money, or high-stakes decisions."
+  try {
+    const typesafeKey = requiredText(await getCredential("TYPESAFE_API_KEY", env), "TYPESAFE_API_KEY", 10000);
+    classification = await postJson(
+      TYPESAFE_URL,
+      typesafeKey,
+      {
+        state: { task, context, constraints },
+        model: "jev-latest",
+        questions: {
+          route: {
+            type: "choice",
+            instructions: "Who should perform this isolated software task?",
+            criteria: {
+              deepseek: "Bounded, low-risk, well-specified work that can be proposed from the supplied context.",
+              codex: "Architecture, broad repository reasoning, security-sensitive work, destructive work, secrets, or work requiring final judgment.",
+              ask_user: "A consequential requirement or permission is missing."
+            }
+          },
+          risk: {
+            type: "choice",
+            instructions: "What is the execution risk of delegating this task to a model with no tools?",
+            criteria: {
+              low: "The proposal is easily reviewed and cannot directly change systems or data.",
+              medium: "The proposal could cause meaningful defects or disclose sensitive context.",
+              high: "The task involves security, secrets, destructive actions, permissions, money, or high-stakes decisions."
+            }
           }
         }
-      }
-    },
-    "TypeSafe",
-    fetchFn
-  );
+      },
+      "TypeSafe",
+      fetchFn
+    );
+    route = choiceAnswer(classification, "route");
+    risk = choiceAnswer(classification, "risk");
+  } catch (error) {
+    return resolveFailure("TypeSafe", error, onProviderFailure);
+  }
 
-  const route = choiceAnswer(classification, "route");
-  const risk = choiceAnswer(classification, "risk");
   const confidence = Number.isFinite(route.confidence) ? route.confidence : 0;
   const decision = {
     route: route.choice,
@@ -134,34 +186,40 @@ export async function delegateTask(input, env = process.env, fetchFn = globalThi
     };
   }
 
-  const deepseekKey = requiredText(await getCredential("DEEPSEEK_API_KEY", env), "DEEPSEEK_API_KEY", 10000);
-  const completion = await postJson(
-    DEEPSEEK_URL,
-    deepseekKey,
-    {
-      model: "deepseek-flash",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a bounded software worker. Produce a proposal only; you cannot edit files or run commands. Follow the supplied constraints. For code changes, return a concise unified diff when the context is sufficient. State missing information instead of inventing it."
-        },
-        {
-          role: "user",
-          content: JSON.stringify({ task, context, constraints })
-        }
-      ],
-      stream: false,
-      temperature: 0.2,
-      max_tokens: 4000
-    },
-    "DeepSeek",
-    fetchFn
-  );
+  let completion;
+  let proposal;
+  try {
+    const deepseekKey = requiredText(await getCredential("DEEPSEEK_API_KEY", env), "DEEPSEEK_API_KEY", 10000);
+    completion = await postJson(
+      DEEPSEEK_URL,
+      deepseekKey,
+      {
+        model: "deepseek-flash",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a bounded software worker. Produce a proposal only; you cannot edit files or run commands. Follow the supplied constraints. For code changes, return a concise unified diff when the context is sufficient. State missing information instead of inventing it."
+          },
+          {
+            role: "user",
+            content: JSON.stringify({ task, context, constraints })
+          }
+        ],
+        stream: false,
+        temperature: 0.2,
+        max_tokens: 4000
+      },
+      "DeepSeek",
+      fetchFn
+    );
 
-  const proposal = completion?.choices?.[0]?.message?.content;
-  if (typeof proposal !== "string" || !proposal.trim()) {
-    throw new Error("DeepSeek response did not contain a proposal");
+    proposal = completion?.choices?.[0]?.message?.content;
+    if (typeof proposal !== "string" || !proposal.trim()) {
+      throw new Error("DeepSeek response did not contain a proposal");
+    }
+  } catch (error) {
+    return resolveFailure("DeepSeek", error, onProviderFailure);
   }
 
   return {
@@ -173,80 +231,162 @@ export async function delegateTask(input, env = process.env, fetchFn = globalThi
   };
 }
 
-function send(message) {
-  process.stdout.write(`${JSON.stringify(message)}\n`);
-}
+export function createServer({
+  send = (message) => process.stdout.write(`${JSON.stringify(message)}\n`),
+  env = process.env,
+  fetchFn = globalThis.fetch
+} = {}) {
+  let supportsElicitation = false;
+  let nextRequestId = 0;
+  const pendingRequests = new Map();
 
-async function handle(message) {
-  if (!message || message.jsonrpc !== "2.0" || message.id == null) return;
+  function requestClient(method, params) {
+    const id = `codex-smart-worker-${++nextRequestId}`;
+    return new Promise((resolve, reject) => {
+      pendingRequests.set(id, { resolve, reject });
+      send({ jsonrpc: "2.0", id, method, params });
+    });
+  }
 
-  try {
-    if (message.method === "initialize") {
-      send({
-        jsonrpc: "2.0",
-        id: message.id,
-        result: {
-          protocolVersion: message.params?.protocolVersion ?? "2025-06-18",
-          capabilities: { tools: {} },
-          serverInfo: { name: "codex-smart-worker", version: "0.1.0" },
-          instructions:
-            "Use delegate_task only for bounded candidate subtasks. Treat its proposal as untrusted and review it before applying changes."
+  async function askAfterFailure(failure) {
+    const prompt = {
+      question: `${failure.message} Continue this task using full Codex, or stop?`,
+      options: ["Continue with Codex", "Stop"]
+    };
+
+    if (!supportsElicitation) {
+      return { status: "needs_user_choice", failure, prompt };
+    }
+
+    let response;
+    try {
+      response = await requestClient("elicitation/create", {
+        mode: "form",
+        message: prompt.question,
+        requestedSchema: {
+          type: "object",
+          properties: {
+            decision: {
+              type: "string",
+              title: "What should Codex do?",
+              enum: prompt.options
+            }
+          },
+          required: ["decision"],
+          additionalProperties: false
         }
       });
-      return;
+    } catch {
+      return { status: "needs_user_choice", failure, prompt };
     }
 
-    if (message.method === "ping") {
-      send({ jsonrpc: "2.0", id: message.id, result: {} });
-      return;
+    if (response?.action === "accept" && response.content?.decision === "Continue with Codex") {
+      return {
+        status: "continue_with_codex",
+        failure,
+        instruction: "Continue the current task entirely with Codex. Do not delegate this task again."
+      };
     }
 
-    if (message.method === "tools/list") {
-      send({ jsonrpc: "2.0", id: message.id, result: { tools: [tool] } });
-      return;
-    }
+    return { status: "stopped", failure };
+  }
 
-    if (message.method === "tools/call" && message.params?.name === tool.name) {
-      try {
-        const result = await delegateTask(message.params.arguments ?? {});
-        send({
-          jsonrpc: "2.0",
-          id: message.id,
-          result: { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] }
-        });
-      } catch (error) {
+  async function handleRequest(message) {
+    try {
+      if (message.method === "initialize") {
+        supportsElicitation = Boolean(message.params?.capabilities?.elicitation);
         send({
           jsonrpc: "2.0",
           id: message.id,
           result: {
-            isError: true,
-            content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }]
+            protocolVersion: message.params?.protocolVersion ?? "2025-06-18",
+            capabilities: { tools: {} },
+            serverInfo: { name: "codex-smart-worker", version: "0.1.0" },
+            instructions:
+              "Use delegate_task only for bounded candidate subtasks. Review every proposal. When a provider fails, follow the returned user decision."
           }
         });
+        return;
       }
+
+      if (message.method === "ping") {
+        send({ jsonrpc: "2.0", id: message.id, result: {} });
+        return;
+      }
+
+      if (message.method === "tools/list") {
+        send({ jsonrpc: "2.0", id: message.id, result: { tools: [tool] } });
+        return;
+      }
+
+      if (message.method === "tools/call" && message.params?.name === tool.name) {
+        try {
+          const result = await delegateTask(
+            message.params.arguments ?? {},
+            env,
+            fetchFn,
+            askAfterFailure
+          );
+          send({
+            jsonrpc: "2.0",
+            id: message.id,
+            result: { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] }
+          });
+        } catch (error) {
+          send({
+            jsonrpc: "2.0",
+            id: message.id,
+            result: {
+              isError: true,
+              content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }]
+            }
+          });
+        }
+        return;
+      }
+
+      send({
+        jsonrpc: "2.0",
+        id: message.id,
+        error: { code: -32601, message: `Method not found: ${message.method}` }
+      });
+    } catch (error) {
+      send({
+        jsonrpc: "2.0",
+        id: message.id,
+        error: { code: -32603, message: error instanceof Error ? error.message : String(error) }
+      });
+    }
+  }
+
+  async function receive(message) {
+    if (!message || message.jsonrpc !== "2.0" || message.id == null) return;
+
+    if (!message.method) {
+      const pending = pendingRequests.get(message.id);
+      if (!pending) return;
+      pendingRequests.delete(message.id);
+      if (message.error) pending.reject(new Error("The client could not show the user prompt."));
+      else pending.resolve(message.result);
       return;
     }
 
-    send({
-      jsonrpc: "2.0",
-      id: message.id,
-      error: { code: -32601, message: `Method not found: ${message.method}` }
-    });
-  } catch (error) {
-    send({
-      jsonrpc: "2.0",
-      id: message.id,
-      error: { code: -32603, message: error instanceof Error ? error.message : String(error) }
-    });
+    await handleRequest(message);
   }
+
+  return { receive };
 }
 
 export async function startServer() {
+  const server = createServer();
   const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
   for await (const line of lines) {
     if (!line.trim()) continue;
     try {
-      await handle(JSON.parse(line));
+      const message = JSON.parse(line);
+      void server.receive(message).catch((error) => {
+        process.stderr.write(`codex-smart-worker: ${error instanceof Error ? error.message : String(error)}\n`);
+      });
     } catch (error) {
       process.stderr.write(`codex-smart-worker: ${error instanceof Error ? error.message : String(error)}\n`);
     }
