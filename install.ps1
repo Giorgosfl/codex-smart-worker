@@ -23,10 +23,10 @@ function Select-Action {
     while ($true) {
         Write-Host ""
         Write-Host "+--------------------------------------------+"
-        Write-Host "|       Codex Smart Worker Installer v3      |"
+        Write-Host "|       Codex Smart Worker Installer v4      |"
         Write-Host "+--------------------------------------------+"
         Write-Host ""
-        Write-Host "  1) Install plugin and set up both API keys"
+        Write-Host "  1) Install plugin and set up missing API keys"
         Write-Host "  2) Change TypeSafe API key"
         Write-Host "  3) Change DeepSeek API key"
         Write-Host "  4) Remove TypeSafe API key"
@@ -88,6 +88,21 @@ function Change-Keys([string]$Target) {
         "deepseek" { Save-Key "deepseek" }
         "all" { Save-Key "typesafe"; Save-Key "deepseek" }
         default { Fail "choose typesafe, deepseek, or all." }
+    }
+}
+
+function Set-MissingKeys {
+    foreach ($target in @("typesafe", "deepseek")) {
+        $file = $CredentialFiles[$target]
+        $label = $CredentialLabels[$target]
+        if ((Test-Path $file -PathType Leaf) -and (Get-Item $file).Length -gt 0) {
+            Protect-CredentialFile $CredentialsDirectory
+            Protect-CredentialFile $file
+            Write-Host "$label already exists. Keeping the saved value."
+        }
+        else {
+            Save-Key $target
+        }
     }
 }
 
@@ -162,13 +177,13 @@ switch ($Action) {
         & codex plugin add $Plugin
         if ($LASTEXITCODE -ne 0) { Fail "plugin installation failed." }
         Write-Host ""
-        Write-Host "Your keys stay on this computer in user-only files."
-        Change-Keys "all"
+        Write-Host "Checking local API keys..."
+        Set-MissingKeys
     }
     "change" { Change-Keys $Target }
     "remove" { Remove-Keys $Target; exit 0 }
     "uninstall" { Uninstall-Plugin; exit 0 }
-    "--keys-only" { Change-Keys "all" }
+    "--keys-only" { Set-MissingKeys }
     "--remove-keys" { Remove-Keys "all"; exit 0 }
     "--dry-run" {
         Write-Host "codex plugin marketplace add $Marketplace"

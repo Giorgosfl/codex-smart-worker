@@ -22,7 +22,7 @@ usage() {
   cat <<'EOF'
 Codex Smart Worker installer
 
-  bash install.sh install          Install the plugin and save both API keys
+  bash install.sh install          Install the plugin and save missing API keys
   bash install.sh change typesafe  Change only the TypeSafe API key
   bash install.sh change deepseek  Change only the DeepSeek API key
   bash install.sh change all       Change both API keys
@@ -40,10 +40,10 @@ choose_action() {
     cat <<'EOF'
 
 ╭────────────────────────────────────────────╮
-│       Codex Smart Worker Installer v3      │
+│       Codex Smart Worker Installer v4      │
 ╰────────────────────────────────────────────╯
 
-  1) Install plugin and set up both API keys
+  1) Install plugin and set up missing API keys
   2) Change TypeSafe API key
   3) Change DeepSeek API key
   4) Remove TypeSafe API key
@@ -136,6 +136,23 @@ change_keys() {
   esac
 }
 
+setup_missing_keys() {
+  local target file label
+
+  for target in typesafe deepseek; do
+    file="$(credential_file "$target")"
+    label="$(credential_label "$target")"
+    if [[ -s "$file" ]]; then
+      chmod 700 "${CREDENTIALS_DIR%/credentials}" "$CREDENTIALS_DIR"
+      chmod 600 "$file"
+      delete_legacy_keychain_key "$target"
+      printf '%s already exists. Keeping the saved value.\n' "$label"
+    else
+      save_key "$target"
+    fi
+  done
+}
+
 delete_keys() {
   case "$1" in
     typesafe) rm -f -- "$TYPESAFE_FILE" ;;
@@ -222,8 +239,8 @@ case "$action" in
     printf 'Installing Codex Smart Worker...\n'
     codex plugin marketplace add "$MARKETPLACE"
     codex plugin add "$PLUGIN"
-    printf '\nYour keys stay on this computer in user-only files.\n'
-    change_keys all
+    printf '\nChecking local API keys...\n'
+    setup_missing_keys
     ;;
   change)
     change_keys "$target"
@@ -237,7 +254,7 @@ case "$action" in
     exit 0
     ;;
   --keys-only)
-    change_keys all
+    setup_missing_keys
     ;;
   --remove-keys)
     remove_keys all
