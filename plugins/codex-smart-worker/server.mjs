@@ -1,6 +1,8 @@
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 
+import { getCredential } from "./credentials.mjs";
+
 const TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone";
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const MIN_CONFIDENCE = 0.75;
@@ -80,7 +82,7 @@ export async function delegateTask(input, env = process.env, fetchFn = globalThi
   const task = requiredText(input?.task, "task", 8000);
   const context = optionalText(input?.context, "context", 60000);
   const constraints = optionalText(input?.constraints, "constraints", 8000);
-  const typesafeKey = requiredText(env.TYPESAFE_API_KEY, "TYPESAFE_API_KEY", 10000);
+  const typesafeKey = requiredText(await getCredential("TYPESAFE_API_KEY", env), "TYPESAFE_API_KEY", 10000);
 
   const classification = await postJson(
     TYPESAFE_URL,
@@ -132,7 +134,7 @@ export async function delegateTask(input, env = process.env, fetchFn = globalThi
     };
   }
 
-  const deepseekKey = requiredText(env.DEEPSEEK_API_KEY, "DEEPSEEK_API_KEY", 10000);
+  const deepseekKey = requiredText(await getCredential("DEEPSEEK_API_KEY", env), "DEEPSEEK_API_KEY", 10000);
   const completion = await postJson(
     DEEPSEEK_URL,
     deepseekKey,

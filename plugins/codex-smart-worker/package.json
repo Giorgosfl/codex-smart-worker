@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "remove-keys": "node scripts/setup.mjs --remove",
     "test": "node --test"
   },
   "engines": {

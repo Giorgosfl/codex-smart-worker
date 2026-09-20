@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { getCredential, KEYCHAIN_SERVICES } from "../credentials.mjs";
 import { delegateTask } from "../server.mjs";
 
 function response(body, status = 200) {
@@ -63,4 +64,18 @@ test("keeps risky work in Codex without calling DeepSeek", async () => {
   assert.equal(result.status, "not_delegated");
   assert.equal(result.decision.route, "codex");
   assert.equal(calls, 1);
+});
+
+test("loads a missing environment credential from macOS Keychain", async () => {
+  let requestedService;
+  const value = await getCredential("TYPESAFE_API_KEY", {}, {
+    platform: "darwin",
+    keychainReader: async (service) => {
+      requestedService = service;
+      return "stored-secret";
+    }
+  });
+
+  assert.equal(value, "stored-secret");
+  assert.equal(requestedService, KEYCHAIN_SERVICES.TYPESAFE_API_KEY);
 });
