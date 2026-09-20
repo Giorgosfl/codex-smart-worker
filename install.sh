@@ -7,6 +7,7 @@ readonly MARKETPLACE="Giorgosfl/codex-smart-worker"
 readonly MARKETPLACE_NAME="codex-smart-worker"
 readonly PLUGIN="codex-smart-worker@codex-smart-worker"
 readonly CREDENTIALS_DIR="${CODEX_HOME:-${HOME}/.codex}/codex-smart-worker/credentials"
+readonly SETTINGS_FILE="${CODEX_HOME:-${HOME}/.codex}/codex-smart-worker/settings.json"
 readonly TYPESAFE_FILE="${CREDENTIALS_DIR}/TYPESAFE_API_KEY"
 readonly DEEPSEEK_FILE="${CREDENTIALS_DIR}/DEEPSEEK_API_KEY"
 readonly KEYCHAIN_ACCOUNT="codex-smart-worker"
@@ -211,7 +212,9 @@ uninstall_plugin() {
   codex plugin remove "$PLUGIN" || printf 'Plugin was already absent; continuing cleanup.\n' >&2
   codex plugin marketplace remove "$MARKETPLACE_NAME" || printf 'Marketplace was already absent; continuing cleanup.\n' >&2
   delete_keys all
-  printf 'Codex Smart Worker, its marketplace, and both local API-key files were removed.\n'
+  rm -f -- "$SETTINGS_FILE"
+  rmdir "${CREDENTIALS_DIR%/credentials}" 2>/dev/null || true
+  printf 'Codex Smart Worker, its marketplace, API keys, and local settings were removed.\n'
 }
 
 action="${1:-}"

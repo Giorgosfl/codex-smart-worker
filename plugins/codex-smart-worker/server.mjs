@@ -1,4 +1,7 @@
 import { createInterface } from "node:readline";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { getCredential } from "./credentials.mjs";
@@ -6,6 +9,9 @@ import { getCredential } from "./credentials.mjs";
 const TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone";
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const MIN_CONFIDENCE = 0.75;
+const DEFAULT_THINKING_EFFORT = "high";
+const THINKING_EFFORTS = Object.freeze(["none", "low", "high", "max"]);
+const MAX_TOKENS_BY_EFFORT = Object.freeze({ none: 4000, low: 8000, high: 16000, max: 32000 });
 
 class ProviderError extends Error {
   constructor(provider, status) {
@@ -14,7 +20,7 @@ class ProviderError extends Error {
   }
 }
 
-const tool = {
+const delegateTaskTool = {
   name: "delegate_task",
   description:
     "Classify one bounded subtask with TypeSafe Jev and delegate it to DeepSeek Flash only when Jev marks it low-risk with sufficient confidence. Returns a proposal for Codex to review. If either provider fails, asks the user whether to continue with Codex or stop.",
@@ -42,6 +48,64 @@ const tool = {
     }
   }
 };
+
+const setThinkingEffortTool = {
+  name: "set_thinking_effort",
+  description:
+    "Change DeepSeek Flash thinking effort for future Smart Worker delegations. Saves the setting locally on this computer.",
+  inputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["effort"],
+    properties: {
+      effort: {
+        type: "string",
+        enum: THINKING_EFFORTS,
+        description: "DeepSeek reasoning effort. The default is high."
+      }
+    }
+  }
+};
+
+const tools = [delegateTaskTool, setThinkingEffortTool];
+
+function settingsFile(env = process.env) {
+  const codexHome = env.CODEX_HOME?.trim() || join(homedir(), ".codex");
+  return join(codexHome, "codex-smart-worker", "settings.json");
+}
+
+function validThinkingEffort(value) {
+  return typeof value === "string" && THINKING_EFFORTS.includes(value.trim().toLowerCase());
+}
+
+export async function getThinkingEffort(env = process.env) {
+  if (validThinkingEffort(env.DEEPSEEK_REASONING_EFFORT)) {
+    return env.DEEPSEEK_REASONING_EFFORT.trim().toLowerCase();
+  }
+
+  try {
+    const settings = JSON.parse(await readFile(settingsFile(env), "utf8"));
+    if (validThinkingEffort(settings.thinkingEffort)) return settings.thinkingEffort.toLowerCase();
+  } catch {
+    // Missing or damaged settings safely fall back to the documented default.
+  }
+
+  return DEFAULT_THINKING_EFFORT;
+}
+
+export async function setThinkingEffort(effort, env = process.env) {
+  if (!validThinkingEffort(effort)) {
+    throw new Error(`effort must be one of: ${THINKING_EFFORTS.join(", ")}`);
+  }
+
+  const value = effort.trim().toLowerCase();
+  const file = settingsFile(env);
+  await mkdir(dirname(file), { recursive: true, mode: 0o700 });
+  await chmod(dirname(file), 0o700);
+  await writeFile(file, `${JSON.stringify({ thinkingEffort: value }, null, 2)}\n`, { mode: 0o600 });
+  await chmod(file, 0o600);
+  return value;
+}
 
 function requiredText(value, name, maxLength) {
   if (typeof value !== "string" || !value.trim()) {
@@ -190,6 +254,7 @@ export async function delegateTask(
   let proposal;
   try {
     const deepseekKey = requiredText(await getCredential("DEEPSEEK_API_KEY", env), "DEEPSEEK_API_KEY", 10000);
+    const thinkingEffort = await getThinkingEffort(env);
     completion = await postJson(
       DEEPSEEK_URL,
       deepseekKey,
@@ -206,9 +271,11 @@ export async function delegateTask(
             content: JSON.stringify({ task, context, constraints })
           }
         ],
+        thinking: { type: thinkingEffort === "none" ? "disabled" : "enabled" },
+        reasoning_effort: thinkingEffort,
         stream: false,
         temperature: 0.2,
-        max_tokens: 4000
+        max_tokens: MAX_TOKENS_BY_EFFORT[thinkingEffort]
       },
       "DeepSeek",
       fetchFn
@@ -226,6 +293,7 @@ export async function delegateTask(
     status: "delegated",
     decision,
     worker: "deepseek-flash",
+    thinking_effort: await getThinkingEffort(env),
     proposal: proposal.trim(),
     usage: completion.usage ?? null
   };
@@ -315,11 +383,41 @@ export function createServer({
       }
 
       if (message.method === "tools/list") {
-        send({ jsonrpc: "2.0", id: message.id, result: { tools: [tool] } });
+        send({ jsonrpc: "2.0", id: message.id, result: { tools } });
         return;
       }
 
-      if (message.method === "tools/call" && message.params?.name === tool.name) {
+      if (message.method === "tools/call" && message.params?.name === setThinkingEffortTool.name) {
+        try {
+          const thinkingEffort = await setThinkingEffort(message.params.arguments?.effort, env);
+          send({
+            jsonrpc: "2.0",
+            id: message.id,
+            result: {
+              content: [{
+                type: "text",
+                text: JSON.stringify({
+                  status: "configured",
+                  thinking_effort: thinkingEffort,
+                  applies_to: "future DeepSeek delegations on this computer"
+                }, null, 2)
+              }]
+            }
+          });
+        } catch (error) {
+          send({
+            jsonrpc: "2.0",
+            id: message.id,
+            result: {
+              isError: true,
+              content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }]
+            }
+          });
+        }
+        return;
+      }
+
+      if (message.method === "tools/call" && message.params?.name === delegateTaskTool.name) {
         try {
           const result = await delegateTask(
             message.params.arguments ?? {},

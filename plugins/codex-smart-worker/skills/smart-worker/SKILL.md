@@ -20,3 +20,5 @@ When TypeSafe or DeepSeek fails, follow the user's choice returned by the tool:
 - `needs_user_choice`: immediately open the host's native user-input prompt with exactly `Continue with Codex` and `Stop`. Continue only after the user chooses the first option; otherwise stop.
 
 If a credential is not configured, use the same choice flow. Direct the user to the local installer only when they want to fix the credential, and never ask them to paste a key into chat.
+
+When the user asks to change DeepSeek thinking or reasoning effort, call `set_thinking_effort` with exactly one of `none`, `low`, `high`, or `max`. The default is `high`. Report the saved value and note that it applies to future DeepSeek delegations on this computer.

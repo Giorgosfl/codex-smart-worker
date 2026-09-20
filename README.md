@@ -37,6 +37,7 @@ Your request
 | Guarded delegation | Jev must approve the task before DeepSeek is called |
 | Human-friendly setup | One menu installs, updates, removes keys, or uninstalls |
 | Codex stays in control | Worker output is only a proposal; Codex reviews it |
+| Adjustable thinking | DeepSeek defaults to `high`; change it later from Codex |
 | Cross-platform | macOS, Linux, and Windows setup scripts |
 
 ## 🚀 Install
@@ -110,7 +111,7 @@ Option **7** removes the plugin, marketplace entry, and both local key files aft
 
 ## 🧩 How delegation works
 
-The plugin includes a local `UserPromptSubmit` hook and exposes one tool: `delegate_task`.
+The plugin includes a local `UserPromptSubmit` hook and exposes two tools: `delegate_task` and `set_thinking_effort`.
 
 1. The hook locally reminds Codex to consider every nontrivial request for delegation. It discards the original prompt and makes no API request.
 2. Codex understands the request and isolates one bounded candidate with only the minimum sanitized context.
@@ -119,6 +120,19 @@ The plugin includes a local `UserPromptSubmit` hook and exposes one tool: `deleg
 5. The result returns to Codex as an untrusted proposal for final review.
 
 This applies to drafting, summarizing, transforming, organizing, research synthesis, and coding. Trivial conversation, secrets, private data, ambiguous planning, tool use, destructive actions, high-stakes decisions, and final judgment stay in Codex. The worker cannot edit files, run terminal commands, or take external actions directly.
+
+### Change DeepSeek thinking effort
+
+DeepSeek Flash uses **high** thinking by default. Ask Codex with any of these commands:
+
+```text
+Set Smart Worker thinking to none
+Set Smart Worker thinking to low
+Set Smart Worker thinking to high
+Set Smart Worker thinking to max
+```
+
+Codex calls the plugin's local `set_thinking_effort` action. The choice is saved on that computer and applies to future DeepSeek delegations without reinstalling the plugin. `none` disables thinking; the other levels enable it with progressively larger output budgets.
 
 Codex requires one-time review because installed-plugin hooks can influence every task. New or changed hook code must be trusted again; the installer never bypasses this safety check.
 

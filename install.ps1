@@ -6,6 +6,7 @@ $MarketplaceName = "codex-smart-worker"
 $Plugin = "codex-smart-worker@codex-smart-worker"
 $CodexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path ([Environment]::GetFolderPath("UserProfile")) ".codex" }
 $CredentialsDirectory = Join-Path $CodexHome "codex-smart-worker\credentials"
+$SettingsFile = Join-Path $CodexHome "codex-smart-worker\settings.json"
 $CredentialFiles = @{
     typesafe = (Join-Path $CredentialsDirectory "TYPESAFE_API_KEY")
     deepseek = (Join-Path $CredentialsDirectory "DEEPSEEK_API_KEY")
@@ -156,7 +157,12 @@ function Uninstall-Plugin {
     & codex plugin remove $Plugin
     & codex plugin marketplace remove $MarketplaceName
     Delete-Keys "all"
-    Write-Host "Codex Smart Worker, its marketplace, and both local API-key files were removed."
+    Remove-Item $SettingsFile -Force -ErrorAction SilentlyContinue
+    $settingsDirectory = Split-Path $SettingsFile
+    if ((Test-Path $settingsDirectory) -and -not (Get-ChildItem $settingsDirectory -Force)) {
+        Remove-Item $settingsDirectory -Force
+    }
+    Write-Host "Codex Smart Worker, its marketplace, API keys, and local settings were removed."
 }
 
 $Action = if ($args.Count -gt 0) { $args[0] } else { "" }

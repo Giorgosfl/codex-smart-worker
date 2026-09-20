@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import { getCredential } from "../credentials.mjs";
@@ -39,7 +42,11 @@ test("delegates a low-risk, high-confidence task to DeepSeek Flash", async () =>
 
   const result = await delegateTask(
     { task: "Summarize these meeting notes into three action items." },
-    { TYPESAFE_API_KEY: "test-typesafe", DEEPSEEK_API_KEY: "test-deepseek" },
+    {
+      TYPESAFE_API_KEY: "test-typesafe",
+      DEEPSEEK_API_KEY: "test-deepseek",
+      DEEPSEEK_REASONING_EFFORT: "high"
+    },
     fetchFn
   );
 
@@ -49,6 +56,69 @@ test("delegates a low-risk, high-confidence task to DeepSeek Flash", async () =>
   assert.equal(requests.length, 2);
   assert.equal(requests[0].body.questions.route.instructions.includes("software"), false);
   assert.equal(requests[1].body.model, "deepseek-flash");
+  assert.deepEqual(requests[1].body.thinking, { type: "enabled" });
+  assert.equal(requests[1].body.reasoning_effort, "high");
+  assert.equal(requests[1].body.max_tokens, 16000);
+  assert.equal(result.thinking_effort, "high");
+});
+
+test("changes DeepSeek thinking effort through the MCP tool", async () => {
+  const codexHome = await mkdtemp(join(tmpdir(), "codex-smart-worker-"));
+  const messages = [];
+  const requests = [];
+  const server = createServer({
+    send: (message) => messages.push(message),
+    env: {
+      CODEX_HOME: codexHome,
+      TYPESAFE_API_KEY: "test-typesafe",
+      DEEPSEEK_API_KEY: "test-deepseek"
+    },
+    fetchFn: async (url, options) => {
+      requests.push({ url, body: JSON.parse(options.body) });
+      if (url.includes("typesafe")) {
+        return response({
+          answers: {
+            route: { choice: "deepseek", confidence: 0.99 },
+            risk: { choice: "low", confidence: 0.99 }
+          }
+        });
+      }
+      return response({ choices: [{ message: { content: "Configured proposal" } }] });
+    }
+  });
+
+  try {
+    await server.receive({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/list",
+      params: {}
+    });
+    await server.receive({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "tools/call",
+      params: { name: "set_thinking_effort", arguments: { effort: "low" } }
+    });
+
+    assert.equal(messages[0].result.tools.some((tool) => tool.name === "set_thinking_effort"), true);
+    assert.equal(toolResult(messages, 2).thinking_effort, "low");
+    const settings = JSON.parse(await readFile(join(codexHome, "codex-smart-worker", "settings.json"), "utf8"));
+    assert.equal(settings.thinkingEffort, "low");
+
+    await server.receive({
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: { name: "delegate_task", arguments: { task: "Draft three headings." } }
+    });
+    assert.equal(requests[1].body.reasoning_effort, "low");
+    assert.deepEqual(requests[1].body.thinking, { type: "enabled" });
+    assert.equal(requests[1].body.max_tokens, 8000);
+    assert.equal(toolResult(messages, 3).thinking_effort, "low");
+  } finally {
+    await rm(codexHome, { recursive: true, force: true });
+  }
 });
 
 test("keeps risky work in Codex without calling DeepSeek", async () => {
