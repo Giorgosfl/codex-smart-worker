@@ -28,14 +28,17 @@ The installer opens this menu:
 4) Remove TypeSafe API key
 5) Remove DeepSeek API key
 6) Remove both API keys
-7) Exit
+7) Uninstall plugin and remove both API keys
+8) Exit
 ```
 
-Option 1 runs the normal Codex marketplace and plugin installation commands, then asks for each key using a hidden macOS Keychain prompt. The key values never appear in shell history, process arguments, the repository, or Codex chat. Restart Codex and begin a new task when it finishes.
+Option 1 runs the normal Codex marketplace and plugin installation commands, then asks for each key using a hidden macOS Keychain prompt. The prompt clearly identifies which API key to paste and explains that it is not asking for your Mac password. The key values never appear in shell history, process arguments, the repository, or Codex chat. Restart Codex and begin a new task when it finishes.
 
 ## Change or remove individual keys
 
 Run the same installer command again and select the key you want to change or remove from the menu.
+
+Option 7 completely uninstalls Codex Smart Worker by removing the plugin, its marketplace entry, and both saved API keys after confirmation.
 
 Removing a key from Keychain does not revoke it. If a key may have been exposed, revoke it on the TypeSafe or DeepSeek website too.
 

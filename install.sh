@@ -3,6 +3,7 @@
 set -euo pipefail
 
 readonly MARKETPLACE="Giorgosfl/codex-smart-worker"
+readonly MARKETPLACE_NAME="codex-smart-worker"
 readonly PLUGIN="codex-smart-worker@codex-smart-worker"
 readonly KEYCHAIN_ACCOUNT="codex-smart-worker"
 readonly TYPESAFE_SERVICE="com.giorgosfl.codex-smart-worker.typesafe"
@@ -24,6 +25,7 @@ Codex Smart Worker installer
   bash install.sh remove typesafe  Remove only the TypeSafe API key
   bash install.sh remove deepseek  Remove only the DeepSeek API key
   bash install.sh remove all       Remove both API keys
+  bash install.sh uninstall        Remove the plugin, marketplace, and both keys
 EOF
 }
 
@@ -41,9 +43,10 @@ Codex Smart Worker
   4) Remove TypeSafe API key
   5) Remove DeepSeek API key
   6) Remove both API keys
-  7) Exit
+  7) Uninstall plugin and remove both API keys
+  8) Exit
 EOF
-    printf '\nChoose an option [1-7]: '
+    printf '\nChoose an option [1-8]: '
     read -r choice || fail "run this installer in an interactive Terminal window."
 
     case "$choice" in
@@ -53,8 +56,9 @@ EOF
       4) action="remove"; target="typesafe"; return ;;
       5) action="remove"; target="deepseek"; return ;;
       6) action="remove"; target="all"; return ;;
-      7) printf 'Goodbye.\n'; exit 0 ;;
-      *) printf 'Please choose a number from 1 to 7.\n' ;;
+      7) action="uninstall"; target=""; return ;;
+      8) printf 'Goodbye.\n'; exit 0 ;;
+      *) printf 'Please choose a number from 1 to 8.\n' ;;
     esac
   done
 }
@@ -63,7 +67,8 @@ save_key() {
   local service="$1"
   local label="$2"
 
-  printf '\n%s\n' "$label"
+  printf '\nPaste your %s at the next prompt, then press Return.\n' "$label"
+  printf 'This is NOT your Mac login password. Nothing will appear while you type or paste.\n'
   /usr/bin/security add-generic-password \
     -U \
     -a "$KEYCHAIN_ACCOUNT" \
@@ -71,6 +76,7 @@ save_key() {
     -l "Codex Smart Worker — $label" \
     -j "Stored locally for the Codex Smart Worker plugin" \
     -w </dev/tty
+  printf 'Saved %s securely in macOS Keychain.\n' "$label"
 }
 
 change_keys() {
@@ -91,6 +97,17 @@ change_keys() {
   esac
 }
 
+delete_keys() {
+  local target="$1"
+
+  if [[ "$target" == "typesafe" || "$target" == "all" ]]; then
+    /usr/bin/security delete-generic-password -a "$KEYCHAIN_ACCOUNT" -s "$TYPESAFE_SERVICE" >/dev/null 2>&1 || true
+  fi
+  if [[ "$target" == "deepseek" || "$target" == "all" ]]; then
+    /usr/bin/security delete-generic-password -a "$KEYCHAIN_ACCOUNT" -s "$DEEPSEEK_SERVICE" >/dev/null 2>&1 || true
+  fi
+}
+
 remove_keys() {
   local target="$1"
   local answer
@@ -104,19 +121,35 @@ remove_keys() {
   esac
 
   printf 'Remove %s from macOS Keychain? [y/N] ' "$description"
-  read -r answer </dev/tty
+  read -r answer
   if [[ ! "$answer" =~ ^[Yy]([Ee][Ss])?$ ]]; then
     printf 'Nothing was removed.\n'
     return
   fi
 
-  if [[ "$target" == "typesafe" || "$target" == "all" ]]; then
-    /usr/bin/security delete-generic-password -a "$KEYCHAIN_ACCOUNT" -s "$TYPESAFE_SERVICE" >/dev/null 2>&1 || true
-  fi
-  if [[ "$target" == "deepseek" || "$target" == "all" ]]; then
-    /usr/bin/security delete-generic-password -a "$KEYCHAIN_ACCOUNT" -s "$DEEPSEEK_SERVICE" >/dev/null 2>&1 || true
-  fi
+  delete_keys "$target"
   printf 'Removed %s from macOS Keychain.\n' "$description"
+}
+
+uninstall_plugin() {
+  local answer
+
+  command -v codex >/dev/null || fail "Codex is not installed or is not available in Terminal."
+  printf 'Uninstall Codex Smart Worker and permanently remove both saved API keys? [y/N] '
+  read -r answer
+  if [[ ! "$answer" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+    printf 'Nothing was removed.\n'
+    return
+  fi
+
+  if ! codex plugin remove "$PLUGIN"; then
+    printf 'Plugin was already absent or could not be removed. Continuing cleanup.\n' >&2
+  fi
+  if ! codex plugin marketplace remove "$MARKETPLACE_NAME"; then
+    printf 'Marketplace was already absent or could not be removed. Continuing cleanup.\n' >&2
+  fi
+  delete_keys all
+  printf 'Codex Smart Worker, its marketplace, and both saved API keys were removed.\n'
 }
 
 action="${1:-}"
@@ -159,6 +192,10 @@ case "$action" in
     ;;
   remove)
     remove_keys "$target"
+    exit 0
+    ;;
+  uninstall)
+    uninstall_plugin
     exit 0
     ;;
   --keys-only)
