@@ -9,7 +9,8 @@
       "cwd": ".",
       "env_vars": [
         "TYPESAFE_API_KEY",
-        "DEEPSEEK_API_KEY"
+        "DEEPSEEK_API_KEY",
+        "CODEX_HOME"
       ],
       "startup_timeout_sec": 10,
       "tool_timeout_sec": 90

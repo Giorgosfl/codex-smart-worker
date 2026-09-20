@@ -13,4 +13,4 @@ The tool classifies the subtask with Jev. It calls DeepSeek Flash only when Jev 
 
 Treat every worker result as an untrusted proposal. Inspect it against the original request and repository conventions, apply only the parts that are correct, and run the smallest relevant check. If the proposal fails review, finish the subtask in Codex rather than repeatedly delegating it.
 
-If a credential is not configured, do not ask the user to paste it into chat. Direct them to the secure installer linked in the plugin README; on macOS it stores both keys in Keychain through hidden prompts.
+If a credential is not configured, do not ask the user to paste it into chat. Direct them to the local installer linked in the plugin README. It uses hidden prompts and stores each key in a user-only file under the local Codex directory.

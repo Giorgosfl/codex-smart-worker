@@ -1,13 +1,17 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -euo pipefail
+umask 077
 
 readonly MARKETPLACE="Giorgosfl/codex-smart-worker"
 readonly MARKETPLACE_NAME="codex-smart-worker"
 readonly PLUGIN="codex-smart-worker@codex-smart-worker"
+readonly CREDENTIALS_DIR="${CODEX_HOME:-${HOME}/.codex}/codex-smart-worker/credentials"
+readonly TYPESAFE_FILE="${CREDENTIALS_DIR}/TYPESAFE_API_KEY"
+readonly DEEPSEEK_FILE="${CREDENTIALS_DIR}/DEEPSEEK_API_KEY"
 readonly KEYCHAIN_ACCOUNT="codex-smart-worker"
-readonly TYPESAFE_SERVICE="com.giorgosfl.codex-smart-worker.typesafe"
-readonly DEEPSEEK_SERVICE="com.giorgosfl.codex-smart-worker.deepseek"
+readonly TYPESAFE_KEYCHAIN_SERVICE="com.giorgosfl.codex-smart-worker.typesafe"
+readonly DEEPSEEK_KEYCHAIN_SERVICE="com.giorgosfl.codex-smart-worker.deepseek"
 
 fail() {
   printf 'Codex Smart Worker: %s\n' "$1" >&2
@@ -35,7 +39,9 @@ choose_action() {
   while true; do
     cat <<'EOF'
 
-Codex Smart Worker Installer v2
+╭────────────────────────────────────────────╮
+│       Codex Smart Worker Installer v3      │
+╰────────────────────────────────────────────╯
 
   1) Install plugin and set up both API keys
   2) Change TypeSafe API key
@@ -47,7 +53,7 @@ Codex Smart Worker Installer v2
   8) Exit
 EOF
     printf '\nChoose an option [1-8]: '
-    read -r choice || fail "run this installer in an interactive Terminal window."
+    read -r choice </dev/tty || fail "run this installer in an interactive terminal."
 
     case "$choice" in
       1) action="install"; target=""; return ;;
@@ -63,55 +69,90 @@ EOF
   done
 }
 
-save_key() {
-  local service="$1"
-  local label="$2"
+credential_file() {
+  case "$1" in
+    typesafe) printf '%s' "$TYPESAFE_FILE" ;;
+    deepseek) printf '%s' "$DEEPSEEK_FILE" ;;
+    *) fail "choose typesafe, deepseek, or all." ;;
+  esac
+}
 
-  printf '\nPaste your %s at the next prompt, then press Return.\n' "$label"
-  printf 'This is NOT your Mac login password. Nothing will appear while you type or paste.\n'
-  /usr/bin/security add-generic-password \
-    -U \
-    -a "$KEYCHAIN_ACCOUNT" \
-    -s "$service" \
-    -l "Codex Smart Worker — $label" \
-    -j "Stored locally for the Codex Smart Worker plugin" \
-    -w </dev/tty
-  printf 'Saved %s securely in macOS Keychain.\n' "$label"
+credential_label() {
+  case "$1" in
+    typesafe) printf 'TypeSafe API key' ;;
+    deepseek) printf 'DeepSeek API key' ;;
+    *) fail "choose typesafe, deepseek, or all." ;;
+  esac
+}
+
+delete_legacy_keychain_key() {
+  [[ "$(uname -s)" == "Darwin" ]] || return 0
+
+  local service
+  case "$1" in
+    typesafe) service="$TYPESAFE_KEYCHAIN_SERVICE" ;;
+    deepseek) service="$DEEPSEEK_KEYCHAIN_SERVICE" ;;
+    all)
+      delete_legacy_keychain_key typesafe
+      delete_legacy_keychain_key deepseek
+      return
+      ;;
+    *) fail "choose typesafe, deepseek, or all." ;;
+  esac
+
+  /usr/bin/security delete-generic-password -a "$KEYCHAIN_ACCOUNT" -s "$service" >/dev/null 2>&1 || true
+}
+
+save_key() {
+  local target="$1"
+  local file label key
+  file="$(credential_file "$target")"
+  label="$(credential_label "$target")"
+
+  printf '\nPaste your %s, then press Return.\n' "$label"
+  printf 'Nothing will appear while you type or paste: '
+  IFS= read -r -s key </dev/tty || fail "could not read the API key."
+  printf '\n'
+  [[ -n "$key" ]] || fail "$label cannot be empty."
+
+  mkdir -p "$CREDENTIALS_DIR"
+  chmod 700 "${CREDENTIALS_DIR%/credentials}" "$CREDENTIALS_DIR"
+  printf '%s' "$key" >"$file"
+  chmod 600 "$file"
+  unset key
+  delete_legacy_keychain_key "$target"
+
+  printf 'Saved %s in a private local file.\n' "$label"
 }
 
 change_keys() {
   case "$1" in
-    typesafe)
-      save_key "$TYPESAFE_SERVICE" "TypeSafe API key"
-      ;;
-    deepseek)
-      save_key "$DEEPSEEK_SERVICE" "DeepSeek API key"
-      ;;
+    typesafe|deepseek) save_key "$1" ;;
     all)
-      save_key "$TYPESAFE_SERVICE" "TypeSafe API key"
-      save_key "$DEEPSEEK_SERVICE" "DeepSeek API key"
+      save_key typesafe
+      save_key deepseek
       ;;
-    *)
-      fail "choose typesafe, deepseek, or all."
-      ;;
+    *) fail "choose typesafe, deepseek, or all." ;;
   esac
 }
 
 delete_keys() {
-  local target="$1"
+  case "$1" in
+    typesafe) rm -f -- "$TYPESAFE_FILE" ;;
+    deepseek) rm -f -- "$DEEPSEEK_FILE" ;;
+    all) rm -f -- "$TYPESAFE_FILE" "$DEEPSEEK_FILE" ;;
+    *) fail "choose typesafe, deepseek, or all." ;;
+  esac
 
-  if [[ "$target" == "typesafe" || "$target" == "all" ]]; then
-    /usr/bin/security delete-generic-password -a "$KEYCHAIN_ACCOUNT" -s "$TYPESAFE_SERVICE" >/dev/null 2>&1 || true
-  fi
-  if [[ "$target" == "deepseek" || "$target" == "all" ]]; then
-    /usr/bin/security delete-generic-password -a "$KEYCHAIN_ACCOUNT" -s "$DEEPSEEK_SERVICE" >/dev/null 2>&1 || true
-  fi
+  delete_legacy_keychain_key "$1"
+
+  rmdir "$CREDENTIALS_DIR" 2>/dev/null || true
+  rmdir "${CREDENTIALS_DIR%/credentials}" 2>/dev/null || true
 }
 
 remove_keys() {
   local target="$1"
-  local answer
-  local description
+  local answer description
 
   case "$target" in
     typesafe) description="the TypeSafe API key" ;;
@@ -120,36 +161,40 @@ remove_keys() {
     *) fail "choose typesafe, deepseek, or all." ;;
   esac
 
-  printf 'Remove %s from macOS Keychain? [y/N] ' "$description"
-  read -r answer
+  printf 'Permanently remove %s from this computer? [y/N] ' "$description"
+  read -r answer </dev/tty
   if [[ ! "$answer" =~ ^[Yy]([Ee][Ss])?$ ]]; then
     printf 'Nothing was removed.\n'
     return
   fi
 
   delete_keys "$target"
-  printf 'Removed %s from macOS Keychain.\n' "$description"
+  printf 'Removed %s from this computer.\n' "$description"
+}
+
+check_requirements() {
+  command -v codex >/dev/null || fail "Codex is not installed or is not available in this terminal."
+  command -v node >/dev/null || fail "Node.js 20 or newer is required."
+  local node_major
+  node_major="$(node -p 'process.versions.node.split(".")[0]')"
+  (( node_major >= 20 )) || fail "Node.js 20 or newer is required."
 }
 
 uninstall_plugin() {
   local answer
 
-  command -v codex >/dev/null || fail "Codex is not installed or is not available in Terminal."
+  command -v codex >/dev/null || fail "Codex is not installed or is not available in this terminal."
   printf 'Uninstall Codex Smart Worker and permanently remove both saved API keys? [y/N] '
-  read -r answer
+  read -r answer </dev/tty
   if [[ ! "$answer" =~ ^[Yy]([Ee][Ss])?$ ]]; then
     printf 'Nothing was removed.\n'
     return
   fi
 
-  if ! codex plugin remove "$PLUGIN"; then
-    printf 'Plugin was already absent or could not be removed. Continuing cleanup.\n' >&2
-  fi
-  if ! codex plugin marketplace remove "$MARKETPLACE_NAME"; then
-    printf 'Marketplace was already absent or could not be removed. Continuing cleanup.\n' >&2
-  fi
+  codex plugin remove "$PLUGIN" || printf 'Plugin was already absent; continuing cleanup.\n' >&2
+  codex plugin marketplace remove "$MARKETPLACE_NAME" || printf 'Marketplace was already absent; continuing cleanup.\n' >&2
   delete_keys all
-  printf 'Codex Smart Worker, its marketplace, and both saved API keys were removed.\n'
+  printf 'Codex Smart Worker, its marketplace, and both local API-key files were removed.\n'
 }
 
 action="${1:-}"
@@ -171,23 +216,16 @@ case "$action" in
     ;;
 esac
 
-[[ "$(uname -s)" == "Darwin" ]] || fail "secure setup currently requires macOS."
-
 case "$action" in
   install)
-    command -v codex >/dev/null || fail "Codex is not installed or is not available in Terminal."
-    command -v node >/dev/null || fail "Node.js 20 or newer is required."
-    node_major="$(node -p 'process.versions.node.split(".")[0]')"
-    (( node_major >= 20 )) || fail "Node.js 20 or newer is required."
-
+    check_requirements
     printf 'Installing Codex Smart Worker...\n'
     codex plugin marketplace add "$MARKETPLACE"
     codex plugin add "$PLUGIN"
-    printf '\nEach API key is entered through a hidden macOS Keychain prompt.\n'
+    printf '\nYour keys stay on this computer in user-only files.\n'
     change_keys all
     ;;
   change)
-    printf 'The API key is entered through a hidden macOS Keychain prompt.\n'
     change_keys "$target"
     ;;
   remove)
@@ -211,4 +249,4 @@ case "$action" in
     ;;
 esac
 
-printf '\nAPI-key update complete. Restart Codex and begin a new task.\n'
+printf '\nDone. Restart Codex and begin a new task.\n'

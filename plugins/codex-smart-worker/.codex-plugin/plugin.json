@@ -1,6 +1,6 @@
 {
   "name": "codex-smart-worker",
-  "version": "0.1.0+codex.20260920073359",
+  "version": "0.1.0+codex.20260920134534",
   "description": "Route bounded work with TypeSafe Jev and delegate eligible tasks to DeepSeek Flash for Codex review.",
   "author": {
     "name": "Giorgos Florou"

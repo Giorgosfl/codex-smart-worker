@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getCredential, KEYCHAIN_SERVICES } from "../credentials.mjs";
+import { getCredential } from "../credentials.mjs";
 import { delegateTask } from "../server.mjs";
 
 function response(body, status = 200) {
@@ -66,16 +66,27 @@ test("keeps risky work in Codex without calling DeepSeek", async () => {
   assert.equal(calls, 1);
 });
 
-test("loads a missing environment credential from macOS Keychain", async () => {
-  let requestedService;
+test("loads a missing environment credential from the local credential file", async () => {
+  let requestedPath;
   const value = await getCredential("TYPESAFE_API_KEY", {}, {
-    platform: "darwin",
-    keychainReader: async (service) => {
-      requestedService = service;
+    directory: "/private/credentials",
+    fileReader: async (path, encoding) => {
+      requestedPath = path;
+      assert.equal(encoding, "utf8");
       return "stored-secret";
     }
   });
 
   assert.equal(value, "stored-secret");
-  assert.equal(requestedService, KEYCHAIN_SERVICES.TYPESAFE_API_KEY);
+  assert.equal(requestedPath, "/private/credentials/TYPESAFE_API_KEY");
+});
+
+test("prefers an environment credential without reading a file", async () => {
+  const value = await getCredential(
+    "DEEPSEEK_API_KEY",
+    { DEEPSEEK_API_KEY: " environment-secret " },
+    { fileReader: async () => assert.fail("file should not be read") }
+  );
+
+  assert.equal(value, "environment-secret");
 });
