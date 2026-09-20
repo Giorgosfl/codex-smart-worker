@@ -13,38 +13,34 @@ Never paste an API key into Codex chat, a GitHub issue, or a configuration file.
 
 ## Install and set up
 
-Open Terminal and copy these commands one at a time:
+First, [review the short installer](https://github.com/Giorgosfl/codex-smart-worker/blob/main/install.sh). Then open Terminal and copy these two lines:
 
 ```sh
-git clone https://github.com/Giorgosfl/codex-smart-worker.git
-cd codex-smart-worker/plugins/codex-smart-worker
-npm run setup
+curl --proto '=https' --tlsv1.2 -fsSLo /tmp/codex-smart-worker-install.sh https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/main/install.sh
+bash /tmp/codex-smart-worker-install.sh
 ```
 
-The setup asks for each key using a hidden Terminal prompt. The keys go directly into your macOS Keychain: this repository, the setup script, and Codex chat never receive or save what you type.
-
-Then install the plugin:
+The installer runs the normal Codex commands:
 
 ```sh
-cd ../..
-codex plugin marketplace add .
+codex plugin marketplace add Giorgosfl/codex-smart-worker
 codex plugin add codex-smart-worker@codex-smart-worker
 ```
 
-Restart Codex and begin a new task.
+It then asks for each key using a hidden macOS Keychain prompt. The key values never appear in shell history, process arguments, the repository, or Codex chat. Restart Codex and begin a new task when it finishes.
 
 ## Replace or remove keys
 
-To replace either key, return to `codex-smart-worker/plugins/codex-smart-worker` and run:
+To replace either key, run the downloaded installer in keys-only mode:
 
 ```sh
-npm run setup
+bash /tmp/codex-smart-worker-install.sh --keys-only
 ```
 
 To remove both saved keys:
 
 ```sh
-npm run remove-keys
+bash /tmp/codex-smart-worker-install.sh --remove-keys
 ```
 
 Removing a key from Keychain does not revoke it. If a key may have been exposed, revoke it on the TypeSafe or DeepSeek website too.
@@ -57,6 +53,6 @@ The worker has no direct file or terminal access. Environment variables remain a
 
 ## Troubleshooting
 
-- **“API key is not configured”** — run `npm run setup`, restart Codex, and start a new task.
-- **Setup says it needs Terminal** — run it in the Terminal app, not inside Codex chat.
+- **“API key is not configured”** — rerun the installer with `--keys-only`, restart Codex, and start a new task.
+- **Setup cannot open a prompt** — run the installer in the Terminal app, not inside Codex chat.
 - **Plugin changes are not visible** — reinstall the plugin, restart Codex, and start a new task.

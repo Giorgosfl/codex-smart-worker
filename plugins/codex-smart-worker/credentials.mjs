@@ -44,5 +44,5 @@ export async function getCredential(
     // Replace the Keychain command's noisy error with a safe setup instruction.
   }
 
-  throw new Error(`${name} is not configured. Run npm run setup in the plugin folder.`);
+  throw new Error(`${name} is not configured. Run the secure installer linked in the plugin README.`);
 }
