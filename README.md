@@ -13,11 +13,10 @@ Never paste an API key into Codex chat, a GitHub issue, or a configuration file.
 
 ## Install and set up
 
-First, [review the short installer](https://github.com/Giorgosfl/codex-smart-worker/blob/main/install.sh). Then open Terminal and copy these two lines:
+First, [review the short installer](https://github.com/Giorgosfl/codex-smart-worker/blob/main/install.sh). Then open Terminal and run:
 
 ```sh
-curl --proto '=https' --tlsv1.2 -fsSLo /tmp/codex-smart-worker-install.sh https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/main/install.sh
-bash /tmp/codex-smart-worker-install.sh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/main/install.sh)"
 ```
 
 The installer runs the normal Codex commands:
@@ -29,18 +28,21 @@ codex plugin add codex-smart-worker@codex-smart-worker
 
 It then asks for each key using a hidden macOS Keychain prompt. The key values never appear in shell history, process arguments, the repository, or Codex chat. Restart Codex and begin a new task when it finishes.
 
-## Replace or remove keys
+## Change or remove individual keys
 
-To replace either key, run the downloaded installer in keys-only mode:
+Change only the key you need:
 
 ```sh
-bash /tmp/codex-smart-worker-install.sh --keys-only
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/main/install.sh)" -- change typesafe
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/main/install.sh)" -- change deepseek
 ```
 
-To remove both saved keys:
+Remove one key or both keys:
 
 ```sh
-bash /tmp/codex-smart-worker-install.sh --remove-keys
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/main/install.sh)" -- remove typesafe
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/main/install.sh)" -- remove deepseek
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/main/install.sh)" -- remove all
 ```
 
 Removing a key from Keychain does not revoke it. If a key may have been exposed, revoke it on the TypeSafe or DeepSeek website too.
@@ -53,6 +55,6 @@ The worker has no direct file or terminal access. Environment variables remain a
 
 ## Troubleshooting
 
-- **“API key is not configured”** — rerun the installer with `--keys-only`, restart Codex, and start a new task.
+- **“API key is not configured”** — use `change typesafe` or `change deepseek`, restart Codex, and start a new task.
 - **Setup cannot open a prompt** — run the installer in the Terminal app, not inside Codex chat.
 - **Plugin changes are not visible** — reinstall the plugin, restart Codex, and start a new task.

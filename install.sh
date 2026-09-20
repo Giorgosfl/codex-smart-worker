@@ -13,6 +13,20 @@ fail() {
   exit 1
 }
 
+usage() {
+  cat <<'EOF'
+Codex Smart Worker installer
+
+  bash install.sh install          Install the plugin and save both API keys
+  bash install.sh change typesafe  Change only the TypeSafe API key
+  bash install.sh change deepseek  Change only the DeepSeek API key
+  bash install.sh change all       Change both API keys
+  bash install.sh remove typesafe  Remove only the TypeSafe API key
+  bash install.sh remove deepseek  Remove only the DeepSeek API key
+  bash install.sh remove all       Remove both API keys
+EOF
+}
+
 save_key() {
   local service="$1"
   local label="$2"
@@ -27,35 +41,71 @@ save_key() {
     -w </dev/tty
 }
 
+change_keys() {
+  case "$1" in
+    typesafe)
+      save_key "$TYPESAFE_SERVICE" "TypeSafe API key"
+      ;;
+    deepseek)
+      save_key "$DEEPSEEK_SERVICE" "DeepSeek API key"
+      ;;
+    all)
+      save_key "$TYPESAFE_SERVICE" "TypeSafe API key"
+      save_key "$DEEPSEEK_SERVICE" "DeepSeek API key"
+      ;;
+    *)
+      fail "choose typesafe, deepseek, or all."
+      ;;
+  esac
+}
+
 remove_keys() {
+  local target="$1"
   local answer
-  printf 'Remove both Codex Smart Worker keys from macOS Keychain? [y/N] '
+  local description
+
+  case "$target" in
+    typesafe) description="the TypeSafe API key" ;;
+    deepseek) description="the DeepSeek API key" ;;
+    all) description="both API keys" ;;
+    *) fail "choose typesafe, deepseek, or all." ;;
+  esac
+
+  printf 'Remove %s from macOS Keychain? [y/N] ' "$description"
   read -r answer </dev/tty
   if [[ ! "$answer" =~ ^[Yy]([Ee][Ss])?$ ]]; then
     printf 'Nothing was removed.\n'
     return
   fi
 
-  /usr/bin/security delete-generic-password -a "$KEYCHAIN_ACCOUNT" -s "$TYPESAFE_SERVICE" >/dev/null 2>&1 || true
-  /usr/bin/security delete-generic-password -a "$KEYCHAIN_ACCOUNT" -s "$DEEPSEEK_SERVICE" >/dev/null 2>&1 || true
-  printf 'Codex Smart Worker keys were removed from macOS Keychain.\n'
+  if [[ "$target" == "typesafe" || "$target" == "all" ]]; then
+    /usr/bin/security delete-generic-password -a "$KEYCHAIN_ACCOUNT" -s "$TYPESAFE_SERVICE" >/dev/null 2>&1 || true
+  fi
+  if [[ "$target" == "deepseek" || "$target" == "all" ]]; then
+    /usr/bin/security delete-generic-password -a "$KEYCHAIN_ACCOUNT" -s "$DEEPSEEK_SERVICE" >/dev/null 2>&1 || true
+  fi
+  printf 'Removed %s from macOS Keychain.\n' "$description"
 }
 
-[[ "$(uname -s)" == "Darwin" ]] || fail "secure setup currently requires macOS."
+action="${1:-install}"
+target="${2:-}"
 
-case "${1:-}" in
+case "$action" in
+  help|-h|--help)
+    usage
+    exit 0
+    ;;
   --dry-run)
     printf 'codex plugin marketplace add %s\n' "$MARKETPLACE"
     printf 'codex plugin add %s\n' "$PLUGIN"
     exit 0
     ;;
-  --remove-keys)
-    remove_keys
-    exit 0
-    ;;
-  --keys-only)
-    ;;
-  "")
+esac
+
+[[ "$(uname -s)" == "Darwin" ]] || fail "secure setup currently requires macOS."
+
+case "$action" in
+  install)
     command -v codex >/dev/null || fail "Codex is not installed or is not available in Terminal."
     command -v node >/dev/null || fail "Node.js 20 or newer is required."
     node_major="$(node -p 'process.versions.node.split(".")[0]')"
@@ -64,15 +114,28 @@ case "${1:-}" in
     printf 'Installing Codex Smart Worker...\n'
     codex plugin marketplace add "$MARKETPLACE"
     codex plugin add "$PLUGIN"
+    printf '\nEach API key is entered through a hidden macOS Keychain prompt.\n'
+    change_keys all
+    ;;
+  change)
+    printf 'The API key is entered through a hidden macOS Keychain prompt.\n'
+    change_keys "$target"
+    ;;
+  remove)
+    remove_keys "$target"
+    exit 0
+    ;;
+  --keys-only)
+    change_keys all
+    ;;
+  --remove-keys)
+    remove_keys all
+    exit 0
     ;;
   *)
-    fail "unknown option: $1"
+    usage >&2
+    fail "unknown command: $action"
     ;;
 esac
 
-printf '\nSecure API-key setup\n'
-printf 'Each key is entered through a hidden macOS Keychain prompt. Nothing is saved in chat or configuration files.\n'
-save_key "$TYPESAFE_SERVICE" "TypeSafe API key"
-save_key "$DEEPSEEK_SERVICE" "DeepSeek API key"
-
-printf '\nSetup complete. Restart Codex and begin a new task.\n'
+printf '\nAPI-key update complete. Restart Codex and begin a new task.\n'
