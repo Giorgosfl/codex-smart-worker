@@ -37,6 +37,7 @@ Your request
 | Human-friendly setup | One menu installs, updates, removes keys, or uninstalls |
 | Codex stays in control | Worker output is only a proposal; Codex reviews it |
 | Adjustable thinking | DeepSeek defaults to `high`; change it later from Codex |
+| Automatic usage receipt | Each completed routed task shows requests, reported tokens, and estimated cost |
 | Cross-platform | macOS, Linux, and Windows setup scripts |
 
 ## 🚀 Install
@@ -115,6 +116,8 @@ The plugin includes a local `UserPromptSubmit` hook and exposes two tools: `dele
 3. TypeSafe Jev chooses `deepseek`, `codex`, or `ask_user` and assigns a risk level.
 4. DeepSeek Flash runs only for a low-risk `deepseek` decision with sufficient confidence.
 5. The result returns to Codex as an untrusted proposal for final review.
+
+After Codex finishes the request, it appends a compact **Smart Worker usage** receipt. It reports one TypeSafe request, whether DeepSeek was called, token counts supplied by each provider, DeepSeek cache and reasoning tokens when available, and an estimated USD cost range. The estimate uses published rates dated **2026-09-19**; provider billing dashboards remain authoritative. No usage history is stored or uploaded by the plugin.
 
 This applies to drafting, summarizing, transforming, organizing, research synthesis, and coding. Trivial conversation, secrets, private data, ambiguous planning, tool use, destructive actions, high-stakes decisions, and final judgment stay in Codex. The worker cannot edit files, run terminal commands, or take external actions directly.
 

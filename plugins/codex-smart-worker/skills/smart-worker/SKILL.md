@@ -13,6 +13,8 @@ The tool classifies the subtask with Jev. It calls DeepSeek Flash only when Jev 
 
 Treat every worker result as an untrusted proposal. Inspect it against the original request and applicable conventions, use only the parts that are correct, and run the smallest relevant check. If the proposal fails review, finish the subtask in Codex rather than repeatedly delegating it.
 
+After finishing a request where `delegate_task` was called, append a compact **Smart Worker usage** receipt based only on the returned `stats`. Show each provider's request count and reported token counts, plus the total estimated USD cost range. Omit unavailable token fields and say `cost unavailable` when the estimate is `null`. Label the cost as an estimate; never invent values or expose worker reasoning.
+
 When TypeSafe or DeepSeek fails, follow the user's choice returned by the tool:
 
 - `continue_with_codex`: complete the current task entirely in Codex and do not delegate that task again.

@@ -1,6 +1,6 @@
 {
   "name": "codex-smart-worker",
-  "version": "0.1.0+codex.20260920150439",
+  "version": "0.1.0+codex.20260920154451",
   "description": "Consider general Codex work for TypeSafe Jev classification and delegate eligible bounded tasks to DeepSeek Flash for Codex review.",
   "author": {
     "name": "Giorgos Florou"

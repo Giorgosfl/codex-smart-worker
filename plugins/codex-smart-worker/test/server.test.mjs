@@ -28,6 +28,7 @@ test("delegates a low-risk, high-confidence task to DeepSeek Flash", async () =>
     if (url.includes("typesafe")) {
       return response({
         model: "jev-latest",
+        usage: { input_tokens: 1000, output_tokens: 20 },
         answers: {
           route: { choice: "deepseek", confidence: 0.94, probabilities: { deepseek: 0.94 } },
           risk: { choice: "low", confidence: 0.97 }
@@ -35,8 +36,16 @@ test("delegates a low-risk, high-confidence task to DeepSeek Flash", async () =>
       });
     }
     return response({
+      model: "deepseek-flash",
       choices: [{ message: { content: "Proposed patch" } }],
-      usage: { total_tokens: 12 }
+      usage: {
+        prompt_tokens: 3000,
+        completion_tokens: 3000,
+        total_tokens: 6000,
+        prompt_cache_hit_tokens: 1000,
+        prompt_cache_miss_tokens: 2000,
+        completion_tokens_details: { reasoning_tokens: 2500 }
+      }
     });
   };
 
@@ -60,6 +69,18 @@ test("delegates a low-risk, high-confidence task to DeepSeek Flash", async () =>
   assert.equal(requests[1].body.reasoning_effort, "high");
   assert.equal(requests[1].body.max_tokens, 16000);
   assert.equal(result.thinking_effort, "high");
+  assert.equal(result.stats.typesafe.requests, 1);
+  assert.equal(result.stats.typesafe.estimated_cost_usd, 0.000042);
+  assert.equal(result.stats.deepseek.requests, 1);
+  assert.equal(result.stats.deepseek.reasoning_tokens, 2500);
+  assert.deepEqual(result.stats.deepseek.estimated_cost_usd, {
+    minimum: 0.002103,
+    maximum: 0.004206
+  });
+  assert.deepEqual(result.stats.estimated_total_cost_usd, {
+    minimum: 0.002145,
+    maximum: 0.004248
+  });
 });
 
 test("changes DeepSeek thinking effort through the MCP tool", async () => {
@@ -126,6 +147,7 @@ test("keeps risky work in Codex without calling DeepSeek", async () => {
   const fetchFn = async () => {
     calls += 1;
     return response({
+      usage: { input_tokens: 200, output_tokens: 10 },
       answers: {
         route: { choice: "codex", confidence: 0.99 },
         risk: { choice: "high", confidence: 0.99 }
@@ -141,6 +163,8 @@ test("keeps risky work in Codex without calling DeepSeek", async () => {
 
   assert.equal(result.status, "not_delegated");
   assert.equal(result.decision.route, "codex");
+  assert.equal(result.stats.typesafe.requests, 1);
+  assert.equal(result.stats.deepseek.requests, 0);
   assert.equal(calls, 1);
 });
 

@@ -12,6 +12,13 @@ const MIN_CONFIDENCE = 0.75;
 const DEFAULT_THINKING_EFFORT = "high";
 const THINKING_EFFORTS = Object.freeze(["none", "low", "high", "max"]);
 const MAX_TOKENS_BY_EFFORT = Object.freeze({ none: 4000, low: 8000, high: 16000, max: 32000 });
+const PRICING_AS_OF = "2026-09-19";
+const TYPESAFE_INPUT_USD_PER_MILLION = 0.042;
+const DEEPSEEK_USD_PER_MILLION = Object.freeze({
+  cache_hit: { minimum: 0.003, maximum: 0.006 },
+  cache_miss: { minimum: 0.15, maximum: 0.3 },
+  output: { minimum: 0.6, maximum: 1.2 }
+});
 
 class ProviderError extends Error {
   constructor(provider, status) {
@@ -182,6 +189,76 @@ function choiceAnswer(payload, name) {
   return answer;
 }
 
+function tokenCount(value) {
+  return Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+function usd(tokens, rate) {
+  return tokens == null ? null : Number(((tokens * rate) / 1_000_000).toFixed(12));
+}
+
+function usageStats({ classification, completion, typesafeRequests, deepseekRequests, thinkingEffort }) {
+  const typesafeUsage = classification?.usage;
+  const typesafeInput = tokenCount(typesafeUsage?.input_tokens ?? typesafeUsage?.prompt_tokens);
+  const typesafeOutput = tokenCount(typesafeUsage?.output_tokens ?? typesafeUsage?.completion_tokens);
+  const typesafeCost = typesafeRequests === 0 ? 0 : usd(typesafeInput, TYPESAFE_INPUT_USD_PER_MILLION);
+
+  const deepseekUsage = completion?.usage;
+  const promptTokens = tokenCount(deepseekUsage?.prompt_tokens);
+  const cacheHitTokens = tokenCount(
+    deepseekUsage?.prompt_cache_hit_tokens ?? deepseekUsage?.prompt_tokens_details?.cached_tokens
+  );
+  const cacheMissTokens = tokenCount(deepseekUsage?.prompt_cache_miss_tokens);
+  const completionTokens = tokenCount(deepseekUsage?.completion_tokens);
+  const deepseekCost = deepseekRequests === 0
+    ? { minimum: 0, maximum: 0 }
+    : cacheHitTokens == null || cacheMissTokens == null || completionTokens == null
+      ? null
+      : {
+          minimum: Number((
+            usd(cacheHitTokens, DEEPSEEK_USD_PER_MILLION.cache_hit.minimum) +
+            usd(cacheMissTokens, DEEPSEEK_USD_PER_MILLION.cache_miss.minimum) +
+            usd(completionTokens, DEEPSEEK_USD_PER_MILLION.output.minimum)
+          ).toFixed(12)),
+          maximum: Number((
+            usd(cacheHitTokens, DEEPSEEK_USD_PER_MILLION.cache_hit.maximum) +
+            usd(cacheMissTokens, DEEPSEEK_USD_PER_MILLION.cache_miss.maximum) +
+            usd(completionTokens, DEEPSEEK_USD_PER_MILLION.output.maximum)
+          ).toFixed(12))
+        };
+  const totalCost = typesafeCost == null || deepseekCost == null
+    ? null
+    : {
+        minimum: Number((typesafeCost + deepseekCost.minimum).toFixed(12)),
+        maximum: Number((typesafeCost + deepseekCost.maximum).toFixed(12))
+      };
+
+  return {
+    typesafe: {
+      requests: typesafeRequests,
+      model: classification?.model ?? "jev-latest",
+      input_tokens: typesafeInput,
+      output_tokens: typesafeOutput,
+      estimated_cost_usd: typesafeCost
+    },
+    deepseek: {
+      requests: deepseekRequests,
+      model: completion?.model ?? "deepseek-flash",
+      thinking_effort: thinkingEffort,
+      prompt_tokens: promptTokens,
+      prompt_cache_hit_tokens: cacheHitTokens,
+      prompt_cache_miss_tokens: cacheMissTokens,
+      completion_tokens: completionTokens,
+      reasoning_tokens: tokenCount(deepseekUsage?.completion_tokens_details?.reasoning_tokens),
+      total_tokens: tokenCount(deepseekUsage?.total_tokens),
+      estimated_cost_usd: deepseekCost
+    },
+    estimated_total_cost_usd: totalCost,
+    pricing_as_of: PRICING_AS_OF,
+    cost_note: "Estimate from published token rates; provider billing is authoritative."
+  };
+}
+
 export async function delegateTask(
   input,
   env = process.env,
@@ -194,9 +271,13 @@ export async function delegateTask(
   let classification;
   let route;
   let risk;
+  let typesafeRequests = 0;
+  let deepseekRequests = 0;
+  let thinkingEffort = null;
 
   try {
     const typesafeKey = requiredText(await getCredential("TYPESAFE_API_KEY", env), "TYPESAFE_API_KEY", 10000);
+    typesafeRequests = 1;
     classification = await postJson(
       TYPESAFE_URL,
       typesafeKey,
@@ -230,7 +311,8 @@ export async function delegateTask(
     route = choiceAnswer(classification, "route");
     risk = choiceAnswer(classification, "risk");
   } catch (error) {
-    return resolveFailure("TypeSafe", error, onProviderFailure);
+    const result = await resolveFailure("TypeSafe", error, onProviderFailure);
+    return { ...result, stats: usageStats({ classification, typesafeRequests, deepseekRequests, thinkingEffort }) };
   }
 
   const confidence = Number.isFinite(route.confidence) ? route.confidence : 0;
@@ -246,7 +328,8 @@ export async function delegateTask(
     return {
       status: "not_delegated",
       decision,
-      reason: "Jev kept this task with Codex or requested user input."
+      reason: "Jev kept this task with Codex or requested user input.",
+      stats: usageStats({ classification, typesafeRequests, deepseekRequests, thinkingEffort })
     };
   }
 
@@ -254,7 +337,8 @@ export async function delegateTask(
   let proposal;
   try {
     const deepseekKey = requiredText(await getCredential("DEEPSEEK_API_KEY", env), "DEEPSEEK_API_KEY", 10000);
-    const thinkingEffort = await getThinkingEffort(env);
+    thinkingEffort = await getThinkingEffort(env);
+    deepseekRequests = 1;
     completion = await postJson(
       DEEPSEEK_URL,
       deepseekKey,
@@ -286,16 +370,18 @@ export async function delegateTask(
       throw new Error("DeepSeek response did not contain a proposal");
     }
   } catch (error) {
-    return resolveFailure("DeepSeek", error, onProviderFailure);
+    const result = await resolveFailure("DeepSeek", error, onProviderFailure);
+    return { ...result, stats: usageStats({ classification, typesafeRequests, deepseekRequests, thinkingEffort }) };
   }
 
   return {
     status: "delegated",
     decision,
     worker: "deepseek-flash",
-    thinking_effort: await getThinkingEffort(env),
+    thinking_effort: thinkingEffort,
     proposal: proposal.trim(),
-    usage: completion.usage ?? null
+    usage: completion.usage ?? null,
+    stats: usageStats({ classification, completion, typesafeRequests, deepseekRequests, thinkingEffort })
   };
 }
 
