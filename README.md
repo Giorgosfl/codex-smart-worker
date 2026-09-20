@@ -47,7 +47,7 @@ Your request
 Open Terminal and run:
 
 ```sh
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/6103f8822c96861e03c608960bc3e20bb8a02797/install.sh)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/8cc092ada82cd6ecff5e2c39e78fbc891ef0eecb/install.sh)"
 ```
 
 ### Windows
@@ -55,7 +55,7 @@ Open Terminal and run:
 Open PowerShell and run:
 
 ```powershell
-irm https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/6103f8822c96861e03c608960bc3e20bb8a02797/install.ps1 | iex
+irm https://raw.githubusercontent.com/Giorgosfl/codex-smart-worker/8cc092ada82cd6ecff5e2c39e78fbc891ef0eecb/install.ps1 | iex
 ```
 
 > The installer links are pinned to a specific reviewed commit. You can inspect [install.sh](install.sh) or [install.ps1](install.ps1) before running them.
