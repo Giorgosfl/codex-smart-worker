@@ -1,0 +1,30 @@
+{
+  "name": "codex-smart-worker",
+  "version": "0.1.0",
+  "description": "Route bounded work with TypeSafe Jev and delegate eligible tasks to DeepSeek Flash for Codex review.",
+  "author": {
+    "name": "Giorgos Florou"
+  },
+  "homepage": "https://github.com/Giorgosfl/codex-smart-worker",
+  "repository": "https://github.com/Giorgosfl/codex-smart-worker",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "delegation",
+    "typesafe",
+    "deepseek"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Codex Smart Worker",
+    "shortDescription": "Delegate safe, bounded tasks to DeepSeek Flash.",
+    "longDescription": "Codex plans and reviews while TypeSafe Jev routes bounded work to DeepSeek Flash when risk and confidence allow.",
+    "developerName": "Giorgos Florou",
+    "category": "Productivity",
+    "capabilities": [
+      "External API calls"
+    ],
+    "defaultPrompt": "Use Codex Smart Worker for suitable bounded subtasks, then review the proposed result."
+  }
+}
