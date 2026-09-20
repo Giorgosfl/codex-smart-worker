@@ -38,7 +38,7 @@ test("delegates a low-risk, high-confidence task to DeepSeek Flash", async () =>
   };
 
   const result = await delegateTask(
-    { task: "Rename one local variable and preserve behavior." },
+    { task: "Summarize these meeting notes into three action items." },
     { TYPESAFE_API_KEY: "test-typesafe", DEEPSEEK_API_KEY: "test-deepseek" },
     fetchFn
   );
@@ -47,6 +47,7 @@ test("delegates a low-risk, high-confidence task to DeepSeek Flash", async () =>
   assert.equal(result.worker, "deepseek-flash");
   assert.equal(result.proposal, "Proposed patch");
   assert.equal(requests.length, 2);
+  assert.equal(requests[0].body.questions.route.instructions.includes("software"), false);
   assert.equal(requests[1].body.model, "deepseek-flash");
 });
 

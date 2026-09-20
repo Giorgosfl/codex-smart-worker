@@ -11,7 +11,7 @@
 
 </div>
 
-Codex Smart Worker gives Codex a guarded way to delegate small, well-defined tasks to a cheaper model. TypeSafe Jev classifies each candidate first. DeepSeek Flash receives it only when the task is low-risk and the classification is confident enough. Codex remains responsible for the plan, review, edits, and tests.
+Codex Smart Worker considers general work—not only coding—for guarded delegation to a cheaper model. TypeSafe Jev classifies each sanitized candidate first. DeepSeek Flash receives it only when the task is low-risk and the classification is confident enough. Codex remains responsible for the plan, tools, decisions, review, and final result.
 
 ```text
 Your request
@@ -33,6 +33,7 @@ Your request
 | Feature | Behavior |
 | --- | --- |
 | Local setup | The plugin and API keys stay on your computer |
+| General routing | Every nontrivial request is considered, not only coding |
 | Guarded delegation | Jev must approve the task before DeepSeek is called |
 | Human-friendly setup | One menu installs, updates, removes keys, or uninstalls |
 | Codex stays in control | Worker output is only a proposal; Codex reviews it |
@@ -71,11 +72,11 @@ The same menu handles everything:
 8) Exit
 ```
 
-Choose **1**, paste any missing key into its hidden prompt, restart Codex, and begin a new task. On reinstall, non-empty saved keys are kept automatically. Use options **2** or **3** only when you want to replace a key.
+Choose **1** and paste any missing key into its hidden prompt. Restart Codex, review and trust the **Codex Smart Worker** hook once, then begin a new task. If the review does not appear automatically, type `/hooks` in Codex. On reinstall, non-empty saved keys are kept automatically. Use options **2** or **3** only when you want to replace a key.
 
 ## ✅ Requirements
 
-- Codex with local plugin support
+- Codex with local plugin and lifecycle-hook support
 - Node.js 20 or newer
 - A TypeSafe API key
 - A DeepSeek API key
@@ -95,7 +96,7 @@ The installer creates one private file per key:
 - Windows removes inherited access from each key file and grants access to the current Windows user.
 - The values do not enter shell history, Git, the README, or Codex chat.
 - Apple Keychain is not used.
-- On macOS, installer v4 removes any matching credentials left behind by the older Keychain-based installer.
+- On macOS, installer v5 removes any matching credentials left behind by the older Keychain-based installer.
 - Keys are stored as local plaintext protected by operating-system file permissions; they are not encrypted at rest.
 - Keys are not synchronized. Run the installer once on every computer where you want to use the plugin.
 
@@ -109,15 +110,17 @@ Option **7** removes the plugin, marketplace entry, and both local key files aft
 
 ## 🧩 How delegation works
 
-The plugin exposes one tool: `delegate_task`.
+The plugin includes a local `UserPromptSubmit` hook and exposes one tool: `delegate_task`.
 
-1. Codex isolates a bounded task and sends only the necessary context to TypeSafe Jev.
-2. Jev chooses `deepseek`, `codex`, or `ask_user` and assigns a risk level.
-3. DeepSeek Flash runs only for a low-risk `deepseek` decision with sufficient confidence.
-4. The result returns to Codex as an untrusted proposal.
-5. Codex reviews the proposal and decides whether to apply and test it.
+1. The hook locally reminds Codex to consider every nontrivial request for delegation. It discards the original prompt and makes no API request.
+2. Codex understands the request and isolates one bounded candidate with only the minimum sanitized context.
+3. TypeSafe Jev chooses `deepseek`, `codex`, or `ask_user` and assigns a risk level.
+4. DeepSeek Flash runs only for a low-risk `deepseek` decision with sufficient confidence.
+5. The result returns to Codex as an untrusted proposal for final review.
 
-The worker cannot edit files or run terminal commands directly.
+This applies to drafting, summarizing, transforming, organizing, research synthesis, and coding. Trivial conversation, secrets, private data, ambiguous planning, tool use, destructive actions, high-stakes decisions, and final judgment stay in Codex. The worker cannot edit files, run terminal commands, or take external actions directly.
+
+Codex requires one-time review because installed-plugin hooks can influence every task. New or changed hook code must be trusted again; the installer never bypasses this safety check.
 
 ## 🛟 When a provider fails
 
@@ -145,6 +148,7 @@ If a Codex client does not advertise native MCP elicitation support, the tool re
 | `API key is not configured` | Run the installer again, choose option 2 or 3, then restart Codex |
 | Nothing appears while entering a key | That is expected; the prompt intentionally hides the value |
 | Setup cannot read input | Run it in Terminal or PowerShell, not inside Codex chat |
+| No TypeSafe request appears | Open `/hooks`, trust the Smart Worker hook, restart Codex, and test in a new task; trivial or unsafe work may correctly remain in Codex |
 | Plugin changes are missing | Reinstall the plugin, restart Codex, and start a new task |
 | Using a custom Codex home | Set `CODEX_HOME` before running the installer and before starting Codex |
 

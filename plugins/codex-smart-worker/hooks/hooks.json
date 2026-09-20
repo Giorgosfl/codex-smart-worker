@@ -1,0 +1,18 @@
+{
+  "description": "Consider every general Codex task for guarded Smart Worker delegation.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/user_prompt_submit.mjs\"",
+            "command_windows": "node \"%PLUGIN_ROOT%\\hooks\\user_prompt_submit.mjs\"",
+            "timeout": 5,
+            "statusMessage": "Checking for safe delegation"
+          }
+        ]
+      }
+    ]
+  }
+}

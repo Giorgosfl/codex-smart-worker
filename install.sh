@@ -40,7 +40,7 @@ choose_action() {
     cat <<'EOF'
 
 ╭────────────────────────────────────────────╮
-│       Codex Smart Worker Installer v4      │
+│       Codex Smart Worker Installer v5      │
 ╰────────────────────────────────────────────╯
 
   1) Install plugin and set up missing API keys
@@ -241,6 +241,8 @@ case "$action" in
     codex plugin add "$PLUGIN"
     printf '\nChecking local API keys...\n'
     setup_missing_keys
+    printf '\nOne-time Codex step: review and trust the Codex Smart Worker hook after restarting.\n'
+    printf 'If Codex does not show the review automatically, type /hooks in Codex.\n'
     ;;
   change)
     change_keys "$target"

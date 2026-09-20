@@ -23,7 +23,7 @@ function Select-Action {
     while ($true) {
         Write-Host ""
         Write-Host "+--------------------------------------------+"
-        Write-Host "|       Codex Smart Worker Installer v4      |"
+        Write-Host "|       Codex Smart Worker Installer v5      |"
         Write-Host "+--------------------------------------------+"
         Write-Host ""
         Write-Host "  1) Install plugin and set up missing API keys"
@@ -179,6 +179,9 @@ switch ($Action) {
         Write-Host ""
         Write-Host "Checking local API keys..."
         Set-MissingKeys
+        Write-Host ""
+        Write-Host "One-time Codex step: review and trust the Codex Smart Worker hook after restarting."
+        Write-Host "If Codex does not show the review automatically, type /hooks in Codex."
     }
     "change" { Change-Keys $Target }
     "remove" { Remove-Keys $Target; exit 0 }

@@ -32,12 +32,12 @@ const tool = {
       context: {
         type: "string",
         maxLength: 60000,
-        description: "Only the code or facts needed for this task. Never include secrets."
+        description: "Only the sanitized facts or content needed for this task. Never include secrets or private data."
       },
       constraints: {
         type: "string",
         maxLength: 8000,
-        description: "Repository conventions, prohibited changes, and output requirements."
+        description: "Relevant conventions, prohibited actions, and output requirements."
       }
     }
   }
@@ -142,10 +142,10 @@ export async function delegateTask(
         questions: {
           route: {
             type: "choice",
-            instructions: "Who should perform this isolated software task?",
+            instructions: "Who should produce a proposal for this isolated task?",
             criteria: {
-              deepseek: "Bounded, low-risk, well-specified work that can be proposed from the supplied context.",
-              codex: "Architecture, broad repository reasoning, security-sensitive work, destructive work, secrets, or work requiring final judgment.",
+              deepseek: "Bounded, low-risk, well-specified drafting, summarizing, transformation, organization, analysis, research synthesis, or coding that can be proposed from the supplied context.",
+              codex: "Planning, broad context, tools, private data, security-sensitive work, destructive or external actions, high-stakes decisions, or work requiring final judgment.",
               ask_user: "A consequential requirement or permission is missing."
             }
           },
@@ -199,7 +199,7 @@ export async function delegateTask(
           {
             role: "system",
             content:
-              "You are a bounded software worker. Produce a proposal only; you cannot edit files or run commands. Follow the supplied constraints. For code changes, return a concise unified diff when the context is sufficient. State missing information instead of inventing it."
+              "You are a bounded general-purpose worker. Produce a proposal only; you cannot use tools, edit files, or take external actions. Follow the supplied constraints. Match the requested output format. For code changes, return a concise unified diff when the context is sufficient. State missing information instead of inventing it."
           },
           {
             role: "user",
@@ -303,7 +303,7 @@ export function createServer({
             capabilities: { tools: {} },
             serverInfo: { name: "codex-smart-worker", version: "0.1.0" },
             instructions:
-              "Use delegate_task only for bounded candidate subtasks. Review every proposal. When a provider fails, follow the returned user decision."
+              "Consider bounded candidate subtasks from any domain, not only coding. Send only sanitized minimum context, review every proposal, and follow the returned user decision when a provider fails."
           }
         });
         return;
